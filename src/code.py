@@ -25,10 +25,18 @@ numeric_feats = [
     "dist_precinct_km",
     "pop_density",
 ]
-
+# ----------------------------------------------------------
+# Q1. Exploratory distributions (probability distributions)
+# ----------------------------------------------------------
+numeric_feats_for_plot = [
+    "hour_float",
+    "victim_age",
+    "latitude",
+    "longitude"         
+]
 
 # for every numeric feat create a Distribution_histplot
-for i in range(len(numeric_feats)):
+for i in range(len(numeric_feats_for_plot)):
     fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
     # Custom color for better visibility
@@ -36,7 +44,7 @@ for i in range(len(numeric_feats)):
 
     sns.histplot(
         data=data,
-        x=numeric_feats[i],
+        x=numeric_feats_for_plot[i],
         bins=20,
         kde=True,
         ax=ax,
@@ -44,10 +52,10 @@ for i in range(len(numeric_feats)):
         alpha=0.6,
     )
     # Set labels with improved clarity
-    ax.set_xlabel(numeric_feats[i], fontsize=12)
+    ax.set_xlabel(numeric_feats_for_plot[i], fontsize=12)
     ax.set_ylabel("Frequency", fontsize=12)
     # Adding skewness annotation
-    skewness = data[numeric_feats[i]].skew()
+    skewness = data[numeric_feats_for_plot[i]].skew()
     ax.text(
         0.95,
         0.85,
@@ -61,7 +69,7 @@ for i in range(len(numeric_feats)):
     )
     # Add title and subtitle
     ax.set_title(
-        numeric_feats[i] + " Distribution",
+        numeric_feats_for_plot[i] + " Distribution",
         fontsize=16,
         fontweight="bold",
         loc="left",
@@ -82,7 +90,7 @@ for i in range(len(numeric_feats)):
     featuresPath = plotsPath / "Distribution_histplot_of_numeric_feats"
     os.makedirs(os.path.join(featuresPath), exist_ok=True)
     plt.savefig(
-        str(featuresPath / (numeric_feats[i] + "_Distribution_histplot.png")),
+        str(featuresPath / (numeric_feats_for_plot[i] + "_Distribution_histplot.png")),
         dpi=300,
         bbox_inches="tight",
     )
