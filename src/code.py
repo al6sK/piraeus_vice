@@ -1,26 +1,33 @@
 import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
+from pathlib import Path
+import os
 
-data = pd.read_csv("data/crimes.csv")
+projectDir = Path(__file__).parent.parent
+
+dataPath = projectDir / "data" / "crimes.csv"
+plotsPath = projectDir / "plots"
+
+data = pd.read_csv(str(dataPath))
 print(data.head())
 
 columns = data.columns.tolist()
 print(columns)
 
 numeric_feats = [
-    'hour_float', 
-    'latitude', 
-    'longitude', 
-    'victim_age', 
-    'temp_c', 
-    'humidity',
-    'dist_precinct_km',
-    'pop_density'
-    ]
+    "hour_float",
+    "latitude",
+    "longitude",
+    "victim_age",
+    "temp_c",
+    "humidity",
+    "dist_precinct_km",
+    "pop_density",
+]
 
 
-#for every numeric feat create a Distribution_histplot
+# for every numeric feat create a Distribution_histplot
 for i in range(len(numeric_feats)):
     fig, ax = plt.subplots(1, 1, figsize=(8, 5))
 
@@ -54,7 +61,7 @@ for i in range(len(numeric_feats)):
     )
     # Add title and subtitle
     ax.set_title(
-        numeric_feats[i]+" Distribution",
+        numeric_feats[i] + " Distribution",
         fontsize=16,
         fontweight="bold",
         loc="left",
@@ -72,4 +79,10 @@ for i in range(len(numeric_feats)):
     ax.grid(axis="y", linestyle="--", alpha=0.6)
     sns.despine(left=True)
     plt.tight_layout()
-    plt.savefig("plots/Distribution_histplot_of_numeric_feats/"+numeric_feats[i]+"_Distribution_histplot.png", dpi=300, bbox_inches="tight")
+    featuresPath = plotsPath / "Distribution_histplot_of_numeric_feats"
+    os.makedirs(os.path.join(featuresPath), exist_ok=True)
+    plt.savefig(
+        str(featuresPath / (numeric_feats[i] + "_Distribution_histplot.png")),
+        dpi=300,
+        bbox_inches="tight",
+    )
