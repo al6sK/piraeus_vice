@@ -3,17 +3,17 @@ import seaborn as sns
 import matplotlib.pyplot as plt
 from pathlib import Path
 import os
-
+import math
 projectDir = Path(__file__).parent.parent
 
 dataPath = projectDir / "data" / "crimes.csv"
 plotsPath = projectDir / "plots"
 
 data = pd.read_csv(str(dataPath))
-print(data.head())
+#print(data.head())
 
 columns = data.columns.tolist()
-print(columns)
+#print(columns)
 
 numeric_feats = [
     "hour_float",
@@ -94,3 +94,15 @@ for i in range(len(numeric_feats_for_plot)):
         dpi=300,
         bbox_inches="tight",
     )
+
+#  For the variable hour_float
+#  Fit a single Gaussian distribution N (µ, σ2) using the sample mean and variance.
+hour_float_mean = data["hour_float"].mean()
+print(f"hour_float_mean :{hour_float_mean}")
+print(f"len of hour_float  :{len(data["hour_float"])}")
+
+variance = ( (data["hour_float"] - hour_float_mean)**2 / len(data["hour_float"])).sum()
+print(f"variance :{variance}")
+
+print(data["hour_float"].describe())
+
