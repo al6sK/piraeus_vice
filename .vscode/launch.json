@@ -1,0 +1,10 @@
+{
+    "configurations": [
+        {
+            "name": "Debug Project",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/src/code.py"
+        }
+    ]
+}
