@@ -5,6 +5,12 @@
             "type": "debugpy",
             "request": "launch",
             "program": "${workspaceFolder}/src/code.py"
-        }
+        },
+        {
+            "name": "Debug Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}"
+        },
     ]
 }
