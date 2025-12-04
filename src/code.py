@@ -98,7 +98,7 @@ for i in range(len(numeric_feats_for_plot)):
     )
 
 #  For the variable hour_float
-#  Fit a single Gaussian distribution N (µ, σ2) using the sample mean and variance.
+#  Fit a single Gaussian distribution N (µ, σ^2) using the sample mean and variance.
 hour_float_mean = q1_data["hour_float"].mean()
 print(f"hour_float_mean :{hour_float_mean}")
 print(f"len of hour_float  :{len(q1_data["hour_float"])}")
