@@ -4,16 +4,18 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 import os
 import math
+
 projectDir = Path(__file__).parent.parent
 
 dataPath = projectDir / "data" / "crimes.csv"
 plotsPath = projectDir / "plots"
 
 data = pd.read_csv(str(dataPath))
-#print(data.head())
+
+# use only TRAIN and VAL data 
+q1_data = data[data["split"] != "TEST"]
 
 columns = data.columns.tolist()
-#print(columns)
 
 numeric_feats = [
     "hour_float",
@@ -43,7 +45,7 @@ for i in range(len(numeric_feats_for_plot)):
     color = sns.color_palette("deep")[i]
 
     sns.histplot(
-        data=data,
+        data=q1_data,
         x=numeric_feats_for_plot[i],
         bins=20,
         kde=True,
@@ -55,7 +57,7 @@ for i in range(len(numeric_feats_for_plot)):
     ax.set_xlabel(numeric_feats_for_plot[i], fontsize=12)
     ax.set_ylabel("Frequency", fontsize=12)
     # Adding skewness annotation
-    skewness = data[numeric_feats_for_plot[i]].skew()
+    skewness = q1_data[numeric_feats_for_plot[i]].skew()
     ax.text(
         0.95,
         0.85,
@@ -97,12 +99,12 @@ for i in range(len(numeric_feats_for_plot)):
 
 #  For the variable hour_float
 #  Fit a single Gaussian distribution N (µ, σ2) using the sample mean and variance.
-hour_float_mean = data["hour_float"].mean()
+hour_float_mean = q1_data["hour_float"].mean()
 print(f"hour_float_mean :{hour_float_mean}")
-print(f"len of hour_float  :{len(data["hour_float"])}")
+print(f"len of hour_float  :{len(q1_data["hour_float"])}")
 
-variance = ( (data["hour_float"] - hour_float_mean)**2 / len(data["hour_float"])).sum()
+variance = ( (q1_data["hour_float"] - hour_float_mean)**2 / len(q1_data["hour_float"])).sum()
 print(f"variance :{variance}")
 
-print(data["hour_float"].describe())
+print(q1_data["hour_float"].describe())
 
