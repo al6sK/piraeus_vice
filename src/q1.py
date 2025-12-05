@@ -46,7 +46,7 @@ def hour_float_gaussian_fit(hour_float, fitted_path):
     plt.figure("Gaussian Fit")
 
     plt.title("Hour Float Distribution")
-    sns.histplot(hour_float, stat="density")
+    sns.histplot(hour_float, stat="density", bins=PLOTS_CONFIG["hour_float"]["bins"])
 
     # calculating the Gaussian Distribution
     pdf_values = norm.pdf(x_range, mean, std)
