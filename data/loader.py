@@ -2,7 +2,7 @@ import pandas as pd
 from pathlib import Path
 from enum import Enum
 
-dataPath = Path(__file__).parent / "crimes.csv"
+data_path = Path(__file__).parent / "crimes.csv"
 
 class Filter(Enum):
     TRAIN   = "TRAIN"
@@ -12,7 +12,7 @@ class Filter(Enum):
 
 class DataLoader:
     def __init__(self):
-        self.data = pd.read_csv(dataPath)
+        self.data = pd.read_csv(data_path)
 
     def dataset(self):
         return self.data
