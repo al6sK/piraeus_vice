@@ -1,6 +1,5 @@
 from pathlib import Path
 from scipy.stats import norm
-import os
 import sys
 import numpy as np
 import seaborn as sns
@@ -13,8 +12,9 @@ from loader import DataLoader, Filter
 
 plotsPath = projectDir / "plots"
 featuresPath = plotsPath / "distributions_histplots"
-os.makedirs(os.path.join(featuresPath), exist_ok=True)
-
+fittedPath = plotsPath / "fitted_plots"
+featuresPath.mkdir(parents=True, exist_ok=True)
+fittedPath.mkdir(exist_ok=True)
 dataloader = DataLoader()
 
 dataset = dataloader.split_filters([Filter.TRAIN, Filter.VAL])
@@ -34,15 +34,23 @@ for column, config in plotsconfig.items():
 
 hour_float = dataset["hour_float"]
 
+# arithmetic mean calculation - same as sum(list) / len(list)
 mean = hour_float.mean()
-variance = hour_float.var()
-sigma = np.sqrt(variance)
+
+# standard deviation - same as square root of the variance
+std = hour_float.std()
+
+plt.figure("Gaussian Fit")
+
+plt.title("Hour Float Distribution")
+sns.histplot(hour_float, stat="density")
 
 xMin, xMax = hour_float.min(), hour_float.max()
+x_range = np.linspace(xMin, xMax, 100)
 
-x = np.linspace(xMin, xMax, 100)
-p = norm.pdf(x, mean, sigma)
-
-plt.figure()
-plt.plot(x, p)
+# calculating the Gaussian Distribution
+pdf_values = norm.pdf(x_range, mean, std)
+plt.plot(x_range, pdf_values, color="red", label=f"Fitted Gaussian mean={mean:.2f} std={std:.2f}")
+plt.legend()
+plt.savefig(fittedPath / "hour_float_GaussianFit.png")
 plt.show()
