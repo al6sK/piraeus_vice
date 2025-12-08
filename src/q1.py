@@ -4,6 +4,7 @@ from sklearn.mixture import GaussianMixture
 import numpy as np
 import seaborn as sns
 import matplotlib.pyplot as plt
+import pandas as pd
 from data.loader import DataLoader, Filter
 
 MIXTURE_COMPONENTS = 3
@@ -84,6 +85,16 @@ def gaussian_mixture_fit(hour_float, fitted_path):
     plt.savefig(fitted_path / "GaussianMixtureFit.png")
     plt.close()
 
+def plot_spatial_2d(dataset: pd.DataFrame):
+    sns.histplot(
+        dataset,
+        x='hour_float',
+        y='longitude',
+        bins=PLOTS_CONFIG["hour_float"]["bins"],
+    )
+    plt.show()
+
+
 def q1():
     features_path, fitted_path = setup_paths()
     dataloader = DataLoader()
@@ -92,6 +103,7 @@ def q1():
     hour_float = dataset["hour_float"]
     hour_float_gaussian_fit(hour_float, fitted_path)
     gaussian_mixture_fit(hour_float, fitted_path)
+    plot_spatial_2d(dataset)
 
 
 if __name__ == "__main__":
