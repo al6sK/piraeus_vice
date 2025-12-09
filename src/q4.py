@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix
 from pathlib import Path
 import os
@@ -149,14 +150,17 @@ best_accuracy = 0.0
 res = []
 
 for c in C:
-    model = LogisticRegression(
-        C = c, 
-        multi_class = "ovr", 
-        solver = "liblinear",
+    alpha = 1 / c  
+
+    base = SGDClassifier(
+        alpha = alpha, 
+        loss = "log_loss",
         penalty = "l2",
         max_iter = 1000,
         random_state = 42
     )
+
+    model = OneVsRestClassifier(base)
 
     model.fit(x_train, y_train)
     y_val_pred = model.predict(x_val)
