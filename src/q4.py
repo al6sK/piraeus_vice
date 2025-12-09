@@ -1,7 +1,8 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import sklearn as sk
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, confusion_matrix
 from pathlib import Path
 import os
 
@@ -39,7 +40,7 @@ import os
 # Data Preprocessing
 # 1. Split TRAIN and VAL using split column
 # 2. One-Hot encoding for categorical features
-# 3. Initialize W and b (randomly)
+# 3. Initialize W and b (randomly, done by LogisticRegression)
 
 # Model and Loss Function
 # 1. Multiclass Linear Classifier: f(x) = Wx + b  -> SGDCLassifier or LogisticRegression
@@ -103,9 +104,32 @@ import os
 
 project_dir = Path(__file__).parent.parent
 
-file_path = project_dir / "data" / "crimes.csv"
-data = pd.read_csv(file_path)
+# Load one-hot encoded data
+data_path = project_dir / "data" / "data_encoded.csv"
 
-# Filtering for TRAIN and VAL data only
-q4_data = data[data["split"] != "TEST"].copy() 
+data = pd.read_csv(str(data_path))
+
+# f(x) = Wx + b
+# Preparing input features x and target labels y
+
+y_labels = data["killer_id"].values
+y_onehot = pd.get_dummies(y_labels).values # target values in one-hot encoding
+
+# Labels to drop 
+drop_cols = ["incident_id", "split", "killer_id"]
+x = data.drop(drop_cols).values
+
+# Filtering out only TRAIN and VAL data 
+train_data = data[data["split"] == "TRAIN"]
+val_data = data[data["split"] == "VAL"]
+
+# Final arrays to use
+
+# For training
+x_train =x[train_data]
+y_train = y_onehot[train_data]
+
+# For Accuracy and Confusion matrices
+x_val = x[val_data]
+y_val = y_labels[val_data]
 
