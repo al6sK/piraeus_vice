@@ -6,8 +6,9 @@ from sklearn.metrics import accuracy_score, confusion_matrix
 from pathlib import Path
 import os
 
-
-# Multiclass Classification
+# ----------------------------------------------------------
+# Q4. Multiclass Linear Classifier
+# ----------------------------------------------------------
 
 # Linear Classifier: f(x) = Wx + b
 # Predicted killer for incident i: c_i = argmax_k x f_k(x_i) Essentially, c is class k which returned the greatest f_k(x_i)
@@ -102,6 +103,10 @@ import os
 # 3. Visualize data points plt.scatter(X_PCA[:, 0], X_PCA[:, 1], c=y_train)
 
 
+# ----------------------------------------------------------
+# Q4.1 - Data Preprocessing
+# ----------------------------------------------------------
+
 project_dir = Path(__file__).parent.parent
 
 # Load one-hot encoded data
@@ -116,20 +121,59 @@ y_labels = data["killer_id"].values
 y_onehot = pd.get_dummies(y_labels).values # target values in one-hot encoding
 
 # Labels to drop 
-drop_cols = ["incident_id", "split", "killer_id"]
-x = data.drop(drop_cols).values
+drop_cols = ["incident_id", "split", "killer_id", "weapon_code", "scene_type", "weather"]
+x = data.drop(columns=drop_cols).values
 
 # Filtering out only TRAIN and VAL data 
-train_data = data[data["split"] == "TRAIN"]
-val_data = data[data["split"] == "VAL"]
+train_data = data["split"] == "TRAIN"
+val_data = data["split"] == "VAL"
 
 # Final arrays to use
 
 # For training
-x_train =x[train_data]
-y_train = y_onehot[train_data]
+x_train = x[train_data.values]
+y_train = y_labels[train_data.values]
 
 # For Accuracy and Confusion matrices
-x_val = x[val_data]
-y_val = y_labels[val_data]
+x_val = x[val_data.values]
+y_val = y_labels[val_data.values]
 
+# ----------------------------------------------------------
+# Q4.2 - Hyperparameters Tuning
+# ----------------------------------------------------------
+
+# Finding the optimal C
+C = [0.001, 0.01, 0.1, 1, 10, 100]
+best_C = None
+best_accuracy = 0.0
+res = []
+
+for c in C:
+    model = LogisticRegression(
+        C = c, 
+        multi_class = "ovr", 
+        solver = "liblinear",
+        penalty = "l2",
+        max_iter = 1000,
+        random_state = 42
+    )
+
+    model.fit(x_train, y_train)
+    y_val_pred = model.predict(x_val)
+    accuracy = accuracy_score(y_val, y_val_pred)
+
+    res.append({"C": c, "Accuracy" : accuracy})
+
+    if accuracy > best_accuracy:
+        best_accuracy = accuracy
+        best_C = c
+
+# Printing Results (Optional)
+print("Hyperparameter Tuning Results")
+for r in res:
+    print(f"C = {r['C']: < 6}: Accuracy = {r['Accuracy']:.4f}")
+
+print("\nBest Hyperparameter: ")
+print(f"Best C: {best_C}")
+print(f"Best Accuracy: {best_accuracy:.4f}")
+print("\n")
