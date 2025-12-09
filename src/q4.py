@@ -162,8 +162,21 @@ for c in C:
 
     model = OneVsRestClassifier(base)
 
+    # Model Training
     model.fit(x_train, y_train)
+
+    # Returns 1D array where each element represents the most probable killer 
+    # for each sample in the VAL set - uses argmax internally
     y_val_pred = model.predict(x_val)
+
+    # Returns 2D array where each element represents the probability of each sample
+    # being in each class (killer)
+    # Necessary for SSE Calculation
+    y_val_pred_proba = model.predict_proba(x_val)
+
+    # SSE Calculation L(W, b) = sum_k (y_k - f_k(x_i))^2
+    # Practically, Sum of (true y_pred in onehot - probability of y_pred)^2
+
     accuracy = accuracy_score(y_val, y_val_pred)
 
     res.append({"C": c, "Accuracy" : accuracy})
