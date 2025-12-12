@@ -1,12 +1,21 @@
 import pandas as pd
 import numpy as np
+import seaborn as sns
+
+from pathlib import Path
+import os
+
 import matplotlib.pyplot as plt
+from matplotlib.colors import ListedColormap
+from matplotlib.lines import Line2D
+
+from sklearn.decomposition import PCA
+from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import SGDClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer
 from sklearn.model_selection import GridSearchCV
-from pathlib import Path
-import os
+
 
 # ----------------------------------------------------------
 # Q4. Multiclass Linear Classifier
@@ -248,3 +257,65 @@ conf_mtrx = confusion_matrix(y_val, y_val_pred)
 print("Confusion Matrix:") 
 print(conf_mtrx)
 
+
+# ----------------------------------------------------------
+# Q4.5 - Decision Boundaries Visualization and Overlay (Q3 & Q4)
+# ----------------------------------------------------------
+
+# Q3 Dummy Data for PCA 
+pca = PCA(n_components=2)
+x_pca = pca.fit_transform(x)
+y_pca = y_labels
+
+x_pca_train = x_pca[train_data.values]
+y_pca_train = y_pca[train_data.values]
+x_pca_val = x_pca[val_data.values]
+y_pca_val = y_pca[val_data.values]
+
+# Q4 - Logistic Regression for best model found
+final_model.fit(x_pca_train, y_pca_train)
+
+# Q3 - Naive Bayes Model
+gnb_model = GaussianNB()
+gnb_model.fit(x_pca_train, y_pca_train)
+
+# Decision Boundary Visualization
+x_min, x_max = x_pca[:, 0].min() - 0.5, x_pca[:, 0].max() + 0.5
+y_min, y_max = x_pca[:, 1].min() - 0.5, x_pca[:, 1].max() + 0.5
+xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.05),
+                     np.arange(y_min, y_max, 0.05))
+
+x_mesh = np.c_[xx.ravel(), yy.ravel()]
+
+# Linear predictions
+z_linear = final_model.predict(x_mesh).reshape(xx.shape) 
+z_gnb = gnb_model.predict(x_mesh).reshape(xx.shape)
+
+# Plotting 
+plt.figure(figsize=(10, 7))
+
+# 1 GaussianNB Decision Areas
+cmap_gnb = ListedColormap(["salmon", "lightgreen", "mediumturquoise", "mediumslateblue", "plum", "orange", "royalblue", "forestgreen"])
+plt.contourf(xx, yy, z_gnb, alpha = 0.5, cmap = cmap_gnb)
+
+
+# 2 Linear Decision Boundaries
+plt.contourf(xx, yy, z_linear, levels = np.arange(z_linear.max() + 2) - 0.5)
+
+
+# Data points
+cmap_data = ListedColormap(["red", "green", "blue", "purple", "pink", "brown", "cyan", "lime"])
+scatterplot = plt.scatter(x_pca_val[:, 0], x_pca_val[:, 1], c = y_pca_val, cmap = cmap_data, edgecolors = 'k', s = 50, alpha = 0.8)
+
+plt.xlabel(f"PCA Component 1: {pca.explained_variance_ratio_[0]*100:.2f}%")
+plt.ylabel(f"PCA Component 2: {pca.explained_variance_ratio_[1]*100:.2f}%")
+plt.title("Overlay: Q4. Logistic Regression Decision Boundaries - Q3. GaussianNB Decision Areas")
+plt.grid(True, linestyle = '--', alpha = 0.7)
+
+custom_lines =[
+    Line2D([0], [0], color = "black", linewidth = 2),
+    Line2D([0], [0], color = "gray", linewidth = 4),
+]
+plt.legend(custom_lines, ['Q4. Linear Decision Boundaries', 'Q3. GaussianNB Decision Areas'])
+
+plt.show()
