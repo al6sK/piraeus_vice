@@ -5,7 +5,6 @@ from sklearn.linear_model import SGDClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer
 from sklearn.model_selection import GridSearchCV
-from sklearn.exceptions import FutureWarning
 from pathlib import Path
 import os
 
@@ -158,65 +157,69 @@ def sse_scorer(estimator, x, y):
     return -sse
 
 # ----------------------------------------------------------
-# Q4.2 - Hyperparameters Tuning using GridSearchCV
+# Q4.3 - Hyperparameters Tuning using GridSearchCV
 # ----------------------------------------------------------
 
 # Finding the optimal C
 C = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000,100000]
 best_C = None
+
 best_accuracy = 0.0
 min_sse = np.inf 
+
 res = []
 
-for c in C:
-    alpha = 1 / c  
+alpha = [ 1/c for c in C]
 
-    base = SGDClassifier(
-        alpha = alpha, 
-        loss = "log_loss",
-        penalty = "l2",
-        max_iter = 1000,
-        random_state = 42
-    )
+# Logistic Regression base model using SGDClassifier
+base = SGDClassifier(
+    alpha = alpha, 
+    loss = "log_loss",
+    penalty = "l2",
+    max_iter = 1000,
+    random_state = 42
+)
 
-    model = OneVsRestClassifier(base)
+# Wrapping it with OneVsRestClassifier for multiclass classification
+model = OneVsRestClassifier(base)
 
-    # Model Training
-    model.fit(x_train, y_train)
+# Setting up parameter grid for GridSearchCV
+param_grid = { 'estimator__alpha': alpha}
 
-    # Returns 1D array where each element represents the most probable killer 
-    # for each sample in the VAL set - uses argmax internally
-    y_val_pred = model.predict(x_val)
-
-    # Returns 2D array where each element represents the probability of each sample
-    # being in each class (killer)
-    # Necessary for SSE Calculation
-    y_val_pred_proba = model.predict_proba(x_val)
-
-    # SSE Calculation L(W, b) = sum_k (y_k - f_k(x_i))^2
-    # Practically, Sum of (true y_pred in onehot - probability of y_pred)^2
-    sse = np.sum((y_val_onehot - y_val_pred_proba)**2)
+# Setting up metrics we want to observe after GridSearchCV
+scorers = {
+    'Accuracy' : make_scorer(accuracy_score),
+    'SSE': sse_scorer
+}
 
 
-    accuracy = accuracy_score(y_val, y_val_pred)
+grid_search = GridSearchCV(
+    estimator = model,
+    param_grid = param_grid,
+    scoring = scorers,
+    refit = 'Accuracy',
+    cv = 5, 
+    verbose = 1,
+    return_train_score = False
+)
 
-    res.append({"C": c, "Accuracy" : accuracy})
+# Model Training on TRAIN set
+grid_search.fit(x_train, y_train)
 
-    if accuracy > best_accuracy:
-        best_accuracy = accuracy
-        best_C = c
-        min_sse = sse
-    elif accuracy == best_accuracy and sse < min_sse:
-        best_C = c
-        min_sse = sse
+# ----------------------------------------------------------
+# Q4.4 - Tuning Results
+# ----------------------------------------------------------
 
-# Printing Results (Optional)
-print("Hyperparameter Tuning Results")
-for r in res:
-    print(f"C = {r['C']: < 6}: Accuracy = {r['Accuracy']:.4f}")
+print("\nHyperparameter Tuning Results with GridSearchCV:\n")
 
-print("\nBest Hyperparameter: ")
-print(f"Best C: {best_C}")
-print(f"Best Accuracy: {best_accuracy:.4f}")
-print(f"SSE: {min_sse:.4f}")
-print("\n")
+best_alpha = grid_search.best_params_['estimator__alpha']
+best_C = 1 / best_alpha
+min_sse = -grid_search.cv_results_['mean_test_SSE'][grid_search.best_index_]
+
+print(f"Best C: {best_C:.1f}")
+print(f"Best Alpha: {best_alpha:.6f}")
+print(f"Best Accuracy {grid_search.best_score_:.4f}")
+print(f"Minimun SSE: {min_sse:.4f}")
+
+# print("\nDetailed CV Results:")
+# print("\n")
