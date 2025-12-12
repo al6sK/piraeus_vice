@@ -219,7 +219,32 @@ min_sse = -grid_search.cv_results_['mean_test_SSE'][grid_search.best_index_]
 print(f"Best C: {best_C:.1f}")
 print(f"Best Alpha: {best_alpha:.6f}")
 print(f"Best Accuracy {grid_search.best_score_:.4f}")
-print(f"Minimun SSE: {min_sse:.4f}")
+print(f"Minimum SSE: {min_sse:.4f}")
 
 # print("\nDetailed CV Results:")
 # print("\n")
+
+# ----------------------------------------------------------
+# Q4.4 - Final Evaluation of the best model using VAL set
+# ----------------------------------------------------------
+
+final_model = grid_search.best_estimator_
+
+# Predictions
+y_val_pred = final_model.predict(x_val)
+y_val_proba = final_model.predict_proba(x_val)
+
+# Accuracy Calculation
+final_accuracy_val = accuracy_score(y_val, y_val_pred)
+
+# SSE Calculation
+final_sse = np.sum((y_val_onehot - y_val_proba)**2)
+
+print(f"\nFinal VAL Accuracy: {final_accuracy_val:.4f}\n")
+print(f"Final VAL SSE: {final_sse:.4f}\n")
+
+# Confusion Matrix Calculation
+conf_mtrx = confusion_matrix(y_val, y_val_pred)
+print("Confusion Matrix:") 
+print(conf_mtrx)
+
