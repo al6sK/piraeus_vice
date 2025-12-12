@@ -3,7 +3,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.linear_model import SGDClassifier
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix
+from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer
+from sklearn.model_selection import GridSearchCV
+from sklearn.exceptions import FutureWarning
 from pathlib import Path
 import os
 
@@ -112,12 +114,9 @@ project_dir = Path(__file__).parent.parent
 
 # Load one-hot encoded data
 data_path = project_dir / "data" / "data_encoded.csv"
-
 data = pd.read_csv(str(data_path))
 
-# f(x) = Wx + b
 # Preparing input features x and target labels y
-
 y_labels = data["killer_id"].values
 y_onehot = pd.get_dummies(y_labels).values # target values in one-hot encoding
 
@@ -125,7 +124,7 @@ y_onehot = pd.get_dummies(y_labels).values # target values in one-hot encoding
 drop_cols = ["incident_id", "split", "killer_id", "weapon_code", "scene_type", "weather"]
 x = data.drop(columns=drop_cols).values
 
-# Filtering out only TRAIN and VAL data 
+# Filtering out only TRAIN and VAL data from csv
 train_data = data["split"] == "TRAIN"
 val_data = data["split"] == "VAL"
 
@@ -138,15 +137,35 @@ y_train = y_labels[train_data.values]
 # For Accuracy and Confusion matrices
 x_val = x[val_data.values]
 y_val = y_labels[val_data.values]
+y_val_onehot = y_onehot[val_data.values]
+
 
 # ----------------------------------------------------------
-# Q4.2 - Hyperparameters Tuning
+# Q4.2 - SSE Scorer Function
+# ----------------------------------------------------------
+
+def sse_scorer(estimator, x, y):
+
+    # Predicted probs for each class
+    y_pred_proba = estimator.predict_proba(x)
+
+    # Using reindex to ensure all classes are represented
+    y_onehot = pd.get_dummies(y).reindex(columns=range(y_pred_proba.shape[1]), fill_value=0).values
+
+    sse = np.sum((y_onehot - y_pred_proba)**2)
+
+    # Negative SSE for maximization
+    return -sse
+
+# ----------------------------------------------------------
+# Q4.2 - Hyperparameters Tuning using GridSearchCV
 # ----------------------------------------------------------
 
 # Finding the optimal C
-C = [0.001, 0.01, 0.1, 1, 10, 100]
+C = [0.001, 0.01, 0.1, 1, 10, 100, 1000, 10000,100000]
 best_C = None
 best_accuracy = 0.0
+min_sse = np.inf 
 res = []
 
 for c in C:
@@ -176,6 +195,8 @@ for c in C:
 
     # SSE Calculation L(W, b) = sum_k (y_k - f_k(x_i))^2
     # Practically, Sum of (true y_pred in onehot - probability of y_pred)^2
+    sse = np.sum((y_val_onehot - y_val_pred_proba)**2)
+
 
     accuracy = accuracy_score(y_val, y_val_pred)
 
@@ -184,6 +205,10 @@ for c in C:
     if accuracy > best_accuracy:
         best_accuracy = accuracy
         best_C = c
+        min_sse = sse
+    elif accuracy == best_accuracy and sse < min_sse:
+        best_C = c
+        min_sse = sse
 
 # Printing Results (Optional)
 print("Hyperparameter Tuning Results")
@@ -193,4 +218,5 @@ for r in res:
 print("\nBest Hyperparameter: ")
 print(f"Best C: {best_C}")
 print(f"Best Accuracy: {best_accuracy:.4f}")
+print(f"SSE: {min_sse:.4f}")
 print("\n")
