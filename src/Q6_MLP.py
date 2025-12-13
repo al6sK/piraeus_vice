@@ -7,6 +7,7 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import accuracy_score
+import seaborn as sns
 
 projectDir = Path(__file__).parent.parent
 dataPath = projectDir / "data" / "data_encoded.csv"
@@ -25,8 +26,9 @@ columns_to_delete = [
 data.drop(columns_to_delete, axis=1, inplace=True)
 
 ix_train = np.array(data.index[data['split'] == "TRAIN"])
-ix_dev = np.array(data.index[data['split'] == "VAL"].tolist())
-ix_test = np.array(data.index[data['split'] == "TEST"].tolist())
+ix_dev = np.array(data.index[data['split'] == "VAL"])
+ix_test = np.array(data.index[data['split'] == "TEST"])
+
 data.drop('split', axis=1, inplace=True)
 
 y_encoded = pd.get_dummies(data["killer_id"])  
@@ -176,7 +178,7 @@ def predict_with_MLP(data):
     #return pd.DataFrame([{"Weighted_F1_score": score, "Accuracy": acc}])
     return score , acc
 
-suffle_times = 50
+suffle_times = 5
 temp_X = X
 for j in numeric_features:
     accuracy = []
@@ -233,14 +235,35 @@ catergorical_names = [
 
 features_names = numeric_features + catergorical_names
 feature_accuracy.index = pd.Index(features_names, dtype="category")
+
 feature_accuracy = feature_accuracy.sort_values(by="Weighted_F1_score", ascending=False)
+
 # Round up values to 4 digits
 feature_accuracy["Weighted_F1_score"] = feature_accuracy["Weighted_F1_score"].round(4)
 feature_accuracy["Accuracy"] = feature_accuracy["Accuracy"].round(4)
-# Show
+
+# --------------------------------------------------
+#  Rank and plot a bar chart of the top 5 most important features
+# --------------------------------------------------
 print(feature_accuracy)
 
+colors = [
+    "red" if category in catergorical_names else "blue"
+    for category in feature_accuracy.index
+]
 
+fig, ax = plt.subplots(figsize=(8, 6))
+bars = plt.bar(feature_accuracy.index, feature_accuracy["Accuracy"], color=colors)
 
+plt.xlabel("Categories")
+plt.ylabel("Accuracy")
+plt.title("Accuracy Ranking (large positive indicates that the feature is crucial for correct classification)")
+plt.xticks(rotation=45)
 
-
+ax.grid(True, linestyle="--", alpha=0.6)
+# Προσθήκη τιμών πάνω από τις μπάρες
+for bar in bars:
+    height = bar.get_height()
+    plt.text(bar.get_x() + bar.get_width()/2, height, f'{height:.4f}', ha='center', va='bottom')
+plt.tight_layout()
+plt.savefig(str(featuresPath / "Accuracy Ranking.png"), dpi=300, bbox_inches="tight")
