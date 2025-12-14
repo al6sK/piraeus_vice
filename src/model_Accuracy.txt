@@ -1,0 +1,2 @@
+Weighted F1 score: 0.950
+Accuracy: 0.950

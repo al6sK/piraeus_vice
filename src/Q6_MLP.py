@@ -7,7 +7,6 @@ import matplotlib.pyplot as plt
 import os
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 from sklearn.metrics import accuracy_score
-import seaborn as sns
 
 projectDir = Path(__file__).parent.parent
 dataPath = projectDir / "data" / "data_encoded.csv"
@@ -22,7 +21,6 @@ columns_to_delete = [
     "scene_type",
     "weather"
 ]
-
 data.drop(columns_to_delete, axis=1, inplace=True)
 
 ix_train = np.array(data.index[data['split'] == "TRAIN"])
@@ -46,21 +44,18 @@ y = data["killer_id"]
 
 # best : 
 # 12->12->8     :   Weighted F1 score: 0.948 Accuracy: 0.948
-# 12->8->8      
-# 24->8              
-# 48->8              
+
 class FC_MNIST(models.Model):
     def __init__(self):
         super(FC_MNIST, self).__init__()
         # Creating layers in the initializer
-        self.fc2 = layers.Dense(units = 12, activation="relu")  # Hidden layer
-        self.fc3 = layers.Dense(units = 12, activation="relu")  # Hidden layer
+        self.fc1 = layers.Dense(units=12, activation="relu")   
+        self.fc2 = layers.Dense(units=12, activation="relu")          
         self.fc4 = layers.Dense(units = 8, activation="softmax")  # Output layer
-
     def call(self, input_tensor):
         # Pass input_tensor through the layers sequentially
-        x = self.fc2(input_tensor)
-        x = self.fc3(x)
+        x = self.fc1(input_tensor)
+        x = self.fc2(x)
         return self.fc4(x)
     
 # Create the input layer
@@ -74,8 +69,9 @@ model.summary(expand_nested=True)
 #encode y
 y_onehot = pd.get_dummies(pd.Series(y[ix_train])).values 
 y_dev_onehot = pd.get_dummies(pd.Series(y[ix_dev])).values
-callback = callbacks.EarlyStopping(monitor="val_loss", patience = 30)
-model.compile(optimizer="adam", loss="categorical_crossentropy", metrics=["accuracy"])
+callback = callbacks.EarlyStopping(monitor="val_loss", patience = 30, restore_best_weights=True)
+
+model.compile(optimizer = "adam", loss="categorical_crossentropy", metrics=["accuracy"])
 
 model_hist = model.fit(
     X.iloc[ix_train],
@@ -97,6 +93,9 @@ base_acc = accuracy_score(y_true_int, y_pred_int)
 
 print(f"Weighted F1 score: {base_score:.3f}")
 print(f"Accuracy: {base_acc:.3f}")
+
+# saving model
+model.save("src/best_model.h5")
 
 # --------------------------------------------------
 # Create DataFrame from model history
@@ -178,7 +177,9 @@ def predict_with_MLP(data):
     #return pd.DataFrame([{"Weighted_F1_score": score, "Accuracy": acc}])
     return score , acc
 
-suffle_times = 5
+
+
+suffle_times = 1
 temp_X = X
 for j in numeric_features:
     accuracy = []

@@ -24,12 +24,13 @@ numeric_feats = [
 ]
 # print(data[numeric_feats].head(5))
 
-# keep only 2 decimal digits max for each numeric feature
-for i in numeric_feats:
-    data[i] = data[i].round(2) 
 
 scaler = MinMaxScaler()
 data[numeric_feats] = scaler.fit_transform(data[numeric_feats])
+
+# keep only 3 decimal digits max for each numeric feature
+for i in numeric_feats:
+    data[i] = data[i].round(3)
 
 # print(data[numeric_feats].head(5))
 
