@@ -38,10 +38,6 @@ data.drop('split', axis=1, inplace=True)
 
 y_encoded = pd.get_dummies(data["killer_id"])  
 
-y_train_onehot = y_encoded.iloc[ix_train].to_numpy()
-y_dev_onehot   = y_encoded.iloc[ix_dev].to_numpy()
-y_test_onehot  = y_encoded.iloc[ix_test].to_numpy()
-
 #set X and y
 X = data.drop(columns=["killer_id"]).copy()
 y = data["killer_id"]
@@ -63,10 +59,10 @@ print("Eigenvalues:", eigenvalues)
 
 cumulative_explained_variance = pca.explained_variance_ratio_.cumsum()
 
-# Define the x-tick positions (every 100th point)
+# Define the x-tick positions (every 5th point)
 tmp = np.where(cumulative_explained_variance >= 0.95)[0][0]
 x_ticks = sorted(
-    list(range(0, len(cumulative_explained_variance) + 1, 5))
+    list(range(len(cumulative_explained_variance)))
     + [
         len(cumulative_explained_variance) - 1,
         tmp,
@@ -79,7 +75,7 @@ plt.figure(figsize=(8, 6))
 y_values = cumulative_explained_variance[x_ticks]
 
 # Plot the cumulative explained variance only at the x-tick positions
-plt.plot(x_ticks, y_values, marker="o", linestyle="--", color="b")
+plt.plot(x_ticks, y_values, marker="o", linestyle="--", color="b", linewidth=1.3)
 
 # Highlight the threshold for 95% explained variance
 plt.axhline(cumulative_explained_variance[tmp], color="r", linestyle="--", linewidth=2)
@@ -103,7 +99,7 @@ plt.figtext(
 plt.xlabel("Principal Component")
 plt.ylabel("Explained Variance Ratio")
 
-# Adjust x-ticks to plot every 100th point
+# Adjust x-ticks to plot every 5th point
 plt.xticks(x_ticks)
 
 # Customize gridlines for better readability
@@ -123,7 +119,7 @@ X_val_embed = pca.transform(X_val)
 # Scatter plot of the first two PCA components
 plt.figure(figsize=(8, 6))
 plt.scatter(X_val_embed[:, 0], X_val_embed[:, 1], c=data["killer_id"].iloc[ix_dev], cmap="tab10", alpha=0.7)
-plt.title("PCA: First Two Components", fontsize=16, fontweight="bold")
+plt.title("PCA on VAL: First Two Components", fontsize=16, fontweight="bold")
 plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
 # plt.colorbar()
@@ -144,7 +140,6 @@ X_test = X.iloc[ix_test].to_numpy()
 X_test_embed = pca.transform(X_test)
 
 m = tmp
-
 Z_train = X_train_embed[:,:m-1]
 Z_val = X_val_embed[:,:m-1]
 Z_test = X_test_embed[:,:m-1]
@@ -186,5 +181,5 @@ print("The map:")
 print(mapping)
 
 # --------------------------------------------------------
-# b:
+# d:
 # --------------------------------------------------------
