@@ -51,7 +51,7 @@ X_train = X.iloc[ix_train].to_numpy()
 X_pca = pca.fit_transform(X_train)
 
 eigenvalues = pca.explained_variance_ 
-print("Eigenvalues:", eigenvalues)
+# print("Eigenvalues:", eigenvalues)
 
 # --------------------------------------------------------
 # b)
@@ -148,7 +148,7 @@ Z_test = X_test_embed[:,:m-1]
 # b: Run k-means with k = S
 # --------------------------------------------------------
 
-k = data["killer_id"].nunique()
+k = data["killer_id"].nunique() # = S = 8
 kmeans = KMeans(n_clusters=k, random_state=42)
 clusters = kmeans.fit_predict(Z_train)
 
@@ -181,5 +181,52 @@ print("The map:")
 print(mapping)
 
 # --------------------------------------------------------
-# d:
+# d: Evaluating k-means on VAL
 # --------------------------------------------------------
+
+val_clusters = kmeans.predict(Z_val)
+
+# print(val_clusters)
+# print(data["killer_id"].iloc[ix_dev])
+
+correct_classifications = 0.0
+j=0
+for i in val_clusters:
+    if(mapping[i] == data["killer_id"].iloc[ix_dev[j]]):
+        correct_classifications += 1
+    j += 1
+accuracy = correct_classifications/len(val_clusters)
+print(f"VAL accuracy= {accuracy:.3f}")
+
+# --------------------------------------------------------
+# e: Evaluating k-means on TRAIN
+# --------------------------------------------------------
+
+test_clusters = kmeans.predict(Z_test)
+
+# print(val_clusters)
+# print(data["killer_id"].iloc[ix_dev])
+
+correct_classifications = 0.0
+j=0
+for i in test_clusters:
+    if(mapping[i] == data["killer_id"].iloc[ix_test[j]]):
+        correct_classifications += 1
+    j += 1
+accuracy = correct_classifications/len(test_clusters)
+print(f"TEST accuracy= {accuracy:.3f}")
+
+# --------------------------------------------------------
+# f: project the TEST incidents onto PC1 and PC2 and create a scatter plot
+# --------------------------------------------------------
+
+# Scatter plot of the first two PCA components
+plt.figure(figsize=(8, 6))
+plt.scatter(X_test_embed[:, 0], X_test_embed[:, 1], c=data["killer_id"].iloc[ix_test], cmap="tab10", alpha=0.7)
+plt.title("PCA on TEST: First Two Components", fontsize=16, fontweight="bold")
+plt.xlabel("Principal Component 1")
+plt.ylabel("Principal Component 2")
+# plt.colorbar()
+plt.tight_layout()
+os.makedirs(os.path.join(q8_plotsPath), exist_ok=True)
+plt.savefig(str(q8_plotsPath / "Projection of each TEST feature vector xi onto the first two principal components.png"), dpi=300, bbox_inches="tight")
