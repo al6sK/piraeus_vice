@@ -1,10 +1,12 @@
 import numpy as np
 import pandas as pd
 
-import os
 from pathlib import Path
 
 from sklearn.preprocessing import StandardScaler
+from sklearn.svm import SVC
+from sklearn.model_selection import GridSearchCV, PredefinedSplit
+from sklearn.metrics import accuracy_score
 
 import matplotlib.pyplot as plt
 
@@ -38,11 +40,13 @@ import matplotlib.pyplot as plt
 # The trick is that we can compute the dot product in the higher dimensional space WITHOUT explicitly transforming the data points
 # k(x, y) = phi(x), phi(y) we substitute this in the function above
 
+
+# ----------------------------------------------------------
+# Q4.1 - Data Preprocessing
+# ----------------------------------------------------------
+
 projectDir = Path(__file__).parent.parent
-
 dataPath = projectDir / "data" / "crimes.csv"
-plotsPath = projectDir / "plots"
-
 data = pd.read_csv(str(dataPath))
 
 # Features and labels
@@ -64,10 +68,52 @@ y_train = y_labels[train_data]
 x_val = x[val_data]
 y_val = y_labels[val_data]
 
-# Scaling before passing as input to SVM
-scaler = StandardScaler()
 
+# ----------------------------------------------------------
+# Q4.2 - Scaling the data - Necessary for SVM
+# ----------------------------------------------------------
+scaler = StandardScaler()
 x_train = scaler.fit_transform(x_train)
 x_val = scaler.transform(x_val)
 
 
+# ----------------------------------------------------------
+# Q4.3 - Preparation for GridDearchCV for VAL set Tuning
+# ----------------------------------------------------------
+
+x_combined = np.vstack((x_train, x_val))
+y_combined = np.concatenate((y_train, y_val))
+
+test_fold = np.zeros(x_combined.shape[0])
+test_fold[:len(x_train)] = -1 
+ps = PredefinedSplit(test_fold=test_fold)
+
+params = [
+    {
+        'kernel' : ['rbf'],
+        'C' : [0.1, 1, 10, 100],
+        'gamma' : [0.001, 0.01, 0.1, 1]
+    },
+    {
+        'kernel' : ['poly'],
+        'C' : [0.1, 1, 10, 100],
+        'coef' : [0, 1, 10],
+        'degree' : [2]
+        }
+]
+
+
+# ----------------------------------------------------------
+# Q4.4 - GridSearchCV 
+# ----------------------------------------------------------
+
+model = SVC(decision_function_shape='ovr', random_state=42)
+
+grid_search = GridSearchCV(
+    estimator=model,
+    param_grid=params,
+    scoring='accuracy',
+    cv=ps,
+    n_jobs=-1,
+    verbose=2
+)
