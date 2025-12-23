@@ -4,6 +4,8 @@ import pandas as pd
 import os
 from pathlib import Path
 
+from sklearn.preprocessing import StandardScaler
+
 import matplotlib.pyplot as plt
 
 
@@ -43,20 +45,29 @@ plotsPath = projectDir / "plots"
 
 data = pd.read_csv(str(dataPath))
 
+# Features and labels
+y_labels = data["killer_id"].values
+
+# Columns that are not features to be used for training
+drop_cols = ["incident_id", "split", "killer_id"]
+
+# If other categorical features that have been one-hot encoded are present, they should also be dropped
+x = data.drop(columns=drop_cols).values
+
 # Split data into TRAIN and VAL sets
 train_data = data["split"] == "TRAIN"
 val_data = data["split"] == "VAL"
 
-# Features and labels
+x_train = x[train_data]
+y_train = y_labels[train_data]
 
-# Columns that are not features
-target_col = ""
-drop_cols = []
+x_val = x[val_data]
+y_val = y_labels[val_data]
 
-x_train = train_data.drop(columns=drop_cols).values
-y_train = train_data[target_col].values
+# Scaling before passing as input to SVM
+scaler = StandardScaler()
 
-x_val = val_data.drop(columns=drop_cols).values
-y_val = val_data[target_col].values
+x_train = scaler.fit_transform(x_train)
+x_val = scaler.transform(x_val)
 
 
