@@ -110,10 +110,37 @@ params = [
 model = SVC(decision_function_shape='ovr', random_state=42)
 
 grid_search = GridSearchCV(
-    estimator=model,
-    param_grid=params,
-    scoring='accuracy',
-    cv=ps,
-    n_jobs=-1,
-    verbose=2
+    estimator = model,
+    param_grid = params,
+    scoring = 'accuracy',
+    cv = ps,
+    n_jobs = -1,
+    verbose = 2
 )
+
+grid_search.fit(x_combined, y_combined)
+
+# ----------------------------------------------------------
+# Q4.5 - Tuning Results
+# ----------------------------------------------------------
+
+final_model = grid_search.best_estimator_
+
+best_params = grid_search.best_params_
+best_score = grid_search.best_score_
+
+print(f"")
+print(f"")
+
+if best_params['kernel'] == 'rbf':
+    print(f"Best gamma: {best_params['gamma']}")
+elif best_params['kernel'] == 'poly':
+    print(f"Best coef: {best_params['coef']}")
+    print(f"Degree: {best_params['degree']}")
+
+print(f"\nFinal Model Accuracy on VAL set: {best_score:.4f}")
+
+
+# ----------------------------------------------------------
+# Q4.6 - Confusion Matrix on VAL set 
+# ----------------------------------------------------------
