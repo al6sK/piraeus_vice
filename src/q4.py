@@ -3,6 +3,7 @@ import numpy as np
 import seaborn as sns
 
 from pathlib import Path
+import json
 import os
 
 import matplotlib.pyplot as plt
@@ -256,6 +257,21 @@ print(f"Final VAL SSE: {final_sse:.4f}\n")
 conf_mtrx = confusion_matrix(y_val, y_val_pred)
 print("Confusion Matrix:") 
 print(conf_mtrx)
+
+# Storing Q4 results in JSON file
+q4_results = {
+    "model_name": "SGDClassifier",
+    "accuracy": final_accuracy_val, 
+    "best_params": {
+        "loss": "hinge",
+        "penalty": "l2"
+    }
+}
+
+with open("q4_results.json", "w") as f:
+    json.dump(q4_results, f)
+
+print("\nQ4 results stored!")
 
 
 # ----------------------------------------------------------
