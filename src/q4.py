@@ -296,10 +296,13 @@ gnb_model = GaussianNB()
 gnb_model.fit(x_pca_train, y_pca_train)
 
 # Decision Boundary Visualization
+
+# Mesh Creation
+h = 0.05  # step size in the mesh
 x_min, x_max = x_pca[:, 0].min() - 0.5, x_pca[:, 0].max() + 0.5
 y_min, y_max = x_pca[:, 1].min() - 0.5, x_pca[:, 1].max() + 0.5
-xx, yy = np.meshgrid(np.arange(x_min, x_max, 0.05),
-                     np.arange(y_min, y_max, 0.05))
+xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                     np.arange(y_min, y_max, h))
 
 x_mesh = np.c_[xx.ravel(), yy.ravel()]
 
