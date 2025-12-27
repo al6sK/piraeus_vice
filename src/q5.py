@@ -154,20 +154,20 @@ print("Confusion Matrix:")
 print(conf_mtrx)
 
 
-# Opening Q4 JSON data
-try:
-    with open("q4_results.json", "r") as f:
-        q4_data = json.load(f)
+# # Opening Q4 JSON data
+# try:
+#     with open("q4_results.json", "r") as f:
+#         q4_data = json.load(f)
     
-    sgd_acc = q4_data["accuracy"]
-    diff = accuracy_val - sgd_acc
+#     sgd_acc = q4_data["accuracy"]
+#     diff = accuracy_val - sgd_acc
 
-except FileNotFoundError:
-    print("Run q4.py first to store results")
+# except FileNotFoundError:
+#     print("Run q4.py first to store results")
 
 
 # ----------------------------------------------------------
-# Q4.5 - Decision Boundaries Visualization and Overlay (Q3 & Q4 & Q5)
+# Q4.5 - Decision Regions & Support Vectors Visualization 
 # ----------------------------------------------------------
 
 # PCA Visualization
@@ -187,11 +187,54 @@ svm_optimal = SVC(
     C=best_params['C'],
     gamma=best_params.get('gamma', 'scale'), # In case of rbf kernel
     coef0=best_params.get('coef0', 0),
-    degree=best_params.get('degree', 3),
+    degree=best_params.get('degree', 2),
     random_state=42
 )
 
 #print best_params to check if they are correct
+
+# Training the SVM on  2D PCA data
 svm_optimal.fit(x_pca_train, y_pca_train)
 
+# Boundary Visualization
 
+# Mesh Creation
+h = 0.02  # step size in the mesh
+x_min, x_max = x_pca[:, 0].min() - 1, x_pca[:, 0].max() + 1
+y_min, y_max = x_pca[:, 1].min() - 1, x_pca[:, 1].max() + 1
+xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
+                     np.arange(y_min, y_max, h))
+
+z = svm_optimal.predict(np.c_[xx.ravel(), yy.ravel()])
+z = z.reshape(xx.shape)
+
+plt.figure(figsize=(10, 7))
+
+plt.contourf(xx, yy, z, alpha=0.2, cmap='tab10')
+
+# Data points
+scatter = plt.scatter(
+    x_pca[:, 0], x_pca[:, 1],
+    c=y_labels,
+    edgecolor='k',
+    s = 50,
+    cmap='tab10'
+)
+
+# Support Vectors Visualization
+svm_vectors = svm_optimal.support_vectors_
+plt.scatter(svm_vectors[:, 0], svm_vectors[:, 1], 
+            s = 100, 
+            facecolors = 'none', 
+            edgecolors = 'black', 
+            linewidths = 1.5, 
+            label = 'Support Vectors'
+            )
+
+plt.title(f"Q5. SVM Decision Regions and Support Vectors - Kernel: {best_params['kernel']}, Degree: {best_params.get('degree', 2)}")
+
+plt.xlabel("PCA Component 1")
+plt.ylabel("PCA Component 2")   
+plt.legend(loc='upper right')
+
+plt.show()
