@@ -1,12 +1,15 @@
 import numpy as np
 import pandas as pd
 
+import json
+
 from pathlib import Path
 
 from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVC
 from sklearn.model_selection import GridSearchCV, PredefinedSplit
-from sklearn.metrics import accuracy_score
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.decomposition import PCA
 
 import matplotlib.pyplot as plt
 
@@ -76,7 +79,6 @@ scaler = StandardScaler()
 x_train = scaler.fit_transform(x_train)
 x_val = scaler.transform(x_val)
 
-
 # ----------------------------------------------------------
 # Q4.3 - Preparation for GridDearchCV for VAL set Tuning
 # ----------------------------------------------------------
@@ -97,7 +99,7 @@ params = [
     {
         'kernel' : ['poly'],
         'C' : [0.1, 1, 10, 100],
-        'coef' : [0, 1, 10],
+        'coef0' : [0, 1, 10],
         'degree' : [2]
         }
 ]
@@ -115,13 +117,13 @@ grid_search = GridSearchCV(
     scoring = 'accuracy',
     cv = ps,
     n_jobs = -1,
-    verbose = 2
+    verbose = 1
 )
 
 grid_search.fit(x_combined, y_combined)
 
 # ----------------------------------------------------------
-# Q4.5 - Tuning Results
+# Q4.5 - Final Evaluation of the best model using the VAL set
 # ----------------------------------------------------------
 
 final_model = grid_search.best_estimator_
@@ -129,18 +131,67 @@ final_model = grid_search.best_estimator_
 best_params = grid_search.best_params_
 best_score = grid_search.best_score_
 
-print(f"")
-print(f"")
+y_val_pred = final_model.predict(x_val)
+
+accuracy_val = accuracy_score(y_val, y_val_pred)
+conf_mtrx = confusion_matrix(y_val, y_val_pred)
+
+
+print(f"Analytical Report of SVM\n")
+print(classification_report(y_val, y_val_pred))
 
 if best_params['kernel'] == 'rbf':
-    print(f"Best gamma: {best_params['gamma']}")
+    print(f"Kernel: {best_params['kernel']}")
 elif best_params['kernel'] == 'poly':
-    print(f"Best coef: {best_params['coef']}")
+    print(f"Kernel: {best_params['kernel']}")
+    print(f"Best coef: {best_params['coef0']}")
     print(f"Degree: {best_params['degree']}")
 
 print(f"\nFinal Model Accuracy on VAL set: {best_score:.4f}")
+print(f"SVM VAL Accuracy: {accuracy_val:.4f}")
+
+print("Confusion Matrix:") 
+print(conf_mtrx)
+
+
+# Opening Q4 JSON data
+try:
+    with open("q4_results.json", "r") as f:
+        q4_data = json.load(f)
+    
+    sgd_acc = q4_data["accuracy"]
+    diff = accuracy_val - sgd_acc
+
+except FileNotFoundError:
+    print("Run q4.py first to store results")
 
 
 # ----------------------------------------------------------
-# Q4.6 - Confusion Matrix on VAL set 
+# Q4.5 - Decision Boundaries Visualization and Overlay (Q3 & Q4 & Q5)
 # ----------------------------------------------------------
+
+# PCA Visualization
+pca = PCA(n_components=2)
+x_scaled = scaler.fit_transform(x)
+x_pca = pca.fit_transform(x_scaled)
+
+x_pca_train = x_pca[train_data.values]
+y_pca_train = y_labels[train_data.values]
+
+x_pca_val = x_pca[val_data.values]
+y_pca_val = y_labels[val_data.values]
+
+# SVM model using the optimal parameters
+svm_optimal = SVC(
+    kernel=best_params['kernel'],
+    C=best_params['C'],
+    gamma=best_params.get('gamma', 'scale'), # In case of rbf kernel
+    coef0=best_params.get('coef0', 0),
+    degree=best_params.get('degree', 3),
+    random_state=42
+)
+
+#print best_params to check if they are correct
+svm_optimal.fit(x_pca_train, y_pca_train)
+
+
