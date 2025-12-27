@@ -259,19 +259,19 @@ print("Confusion Matrix:")
 print(conf_mtrx)
 
 # Storing Q4 results in JSON file
-q4_results = {
-    "model_name": "SGDClassifier",
-    "accuracy": final_accuracy_val, 
-    "best_params": {
-        "loss": "hinge",
-        "penalty": "l2"
-    }
-}
+# q4_results = {
+#     "model_name": "SGDClassifier",
+#     "accuracy": final_accuracy_val, 
+#     "best_params": {
+#         "loss": "hinge",
+#         "penalty": "l2"
+#     }
+# }
 
-with open("q4_results.json", "w") as f:
-    json.dump(q4_results, f)
+# with open("q4_results.json", "w") as f:
+#     json.dump(q4_results, f)
 
-print("\nQ4 results stored!")
+# print("\nQ4 results stored!")
 
 
 # ----------------------------------------------------------
