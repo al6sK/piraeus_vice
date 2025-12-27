@@ -250,8 +250,8 @@ final_accuracy_val = accuracy_score(y_val, y_val_pred)
 # SSE Calculation
 final_sse = np.sum((y_val_onehot - y_val_proba)**2)
 
-print(f"\nFinal VAL Accuracy: {final_accuracy_val:.4f}\n")
-print(f"Final VAL SSE: {final_sse:.4f}\n")
+print(f"\nFinal VAL Accuracy: {final_accuracy_val:.4f}")
+print(f"Final VAL SSE: {final_sse:.4f}")
 
 # Confusion Matrix Calculation
 conf_mtrx = confusion_matrix(y_val, y_val_pred)
