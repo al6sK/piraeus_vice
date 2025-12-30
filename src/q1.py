@@ -18,6 +18,7 @@ PLOTS_CONFIG = {
     "victim_age": {"bins": 20},
 }
 
+
 def setup_paths():
     project_dir = Path(__file__).resolve().parent.parent
 
@@ -30,12 +31,14 @@ def setup_paths():
 
     return features_path, fitted_path
 
+
 def plot_data(dataset, features_path):
     for column, config in PLOTS_CONFIG.items():
         plt.figure(column)
         sns.histplot(dataset[column], **config)
         plt.savefig(features_path / (column + ".png"))
         plt.close()
+
 
 def hour_float_gaussian_fit(hour_float, fitted_path):
     x_min, x_max = hour_float.min(), hour_float.max()
@@ -51,7 +54,12 @@ def hour_float_gaussian_fit(hour_float, fitted_path):
 
     # calculating the Gaussian Distribution
     pdf_values = norm.pdf(x_range, mean, std)
-    plt.plot(x_range, pdf_values, color="red", label=f"Fitted Gaussian mean={mean:.2f} std={std:.2f}")
+    plt.plot(
+        x_range,
+        pdf_values,
+        color="red",
+        label=f"Fitted Gaussian mean={mean:.2f} std={std:.2f}",
+    )
     plt.legend()
     plt.savefig(fitted_path / "hour_float_GaussianFit.png")
     plt.close()
@@ -64,7 +72,13 @@ def gaussian_mixture_fit(hour_float, fitted_path):
     gmm.fit(transformed_hour_float)
 
     plt.figure("GMM Fit")
-    sns.histplot(hour_float, stat="density", color="lightgray", label="Data", bins=PLOTS_CONFIG["hour_float"]["bins"])
+    sns.histplot(
+        hour_float,
+        stat="density",
+        color="lightgray",
+        label="Data",
+        bins=PLOTS_CONFIG["hour_float"]["bins"],
+    )
 
     x_min, x_max = hour_float.min(), hour_float.max()
     x_range = np.linspace(x_min, x_max, LIN_SPACE_NUM)
@@ -78,18 +92,25 @@ def gaussian_mixture_fit(hour_float, fitted_path):
 
         component_pdf = weight * norm.pdf(x_range, mean, std)
         total_pdf += component_pdf
-        plt.plot(x_range, component_pdf, '--', alpha=0.7, label=f'Peak={i + 1} (weight={weight:.2f})')
+        plt.plot(
+            x_range,
+            component_pdf,
+            "--",
+            alpha=0.7,
+            label=f"Peak={i + 1} (weight={weight:.2f})",
+        )
 
-    plt.plot(x_range, total_pdf, 'r-', linewidth=3, label='Combined PDF')
+    plt.plot(x_range, total_pdf, "r-", linewidth=3, label="Combined PDF")
     plt.legend()
     plt.savefig(fitted_path / "GaussianMixtureFit.png")
     plt.close()
 
+
 def plot_spatial_2d(dataset: pd.DataFrame):
     sns.histplot(
         dataset,
-        x='hour_float',
-        y='longitude',
+        x="hour_float",
+        y="longitude",
         bins=PLOTS_CONFIG["hour_float"]["bins"],
     )
     plt.show()
