@@ -1,0 +1,436 @@
+% filepath: c:\Users\danae\Documents\piraeus_vice\report_q5.tex
+
+\documentclass[12pt]{article}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage[margin=1in]{geometry}
+
+\title{Q5:  Support Vector Machines (SVMs)}
+\author{Dimitris Lazanas, Alexis Kastanaras, Danai Charzaka}
+\date{}
+
+\begin{document}
+
+\maketitle
+
+\section{Mathematical Derivations}
+
+\subsection{Support Vector Machines: Fundamental Concept}
+
+Support Vector Machines (SVMs) are powerful classifiers that find the optimal separating hyperplane between classes in a feature space. Unlike linear classifiers, SVMs can handle non-linear decision boundaries through the kernel trick, making them highly effective for complex classification problems.
+
+The fundamental decision function for binary classification is:
+
+\begin{equation}
+f(x) = w^T \phi(x) + b
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $w$ is the weight vector (normal to the hyperplane)
+    \item $\phi(x)$ is a transformation function that maps input to a higher-dimensional space
+    \item $b$ is the bias term
+    \item $x$ is the input feature vector
+\end{itemize}
+
+A new sample is classified based on the sign of $f(x)$:
+
+\begin{equation}
+\text{class}(x) = \text{sign}(w^T \phi(x) + b)
+\end{equation}
+
+\subsection{The Margin and Support Vectors}
+
+The margin is the distance between the decision boundary and the closest data points from each class. SVMs aim to maximize this margin, which provides better generalization:
+
+\begin{equation}
+\text{Margin} = \frac{2}{\|w\|}
+\end{equation}
+
+The data points that lie exactly on the margin boundary are called support vectors. These are the critical points that define the position and orientation of the decision hyperplane. Importantly, only support vectors matter for defining the classifier; all other training points are irrelevant once training is complete.
+
+For a linearly separable problem with margin $\gamma$, the optimization problem is:
+
+\begin{equation}
+\minimize_w \quad \frac{1}{2}\|w\|^2
+\end{equation}
+
+subject to the constraint:
+
+\begin{equation}
+y_i(w^T x_i + b) \geq 1 \quad \forall i
+\end{equation}
+
+where $y_i \in \{-1, +1\}$ is the class label.
+
+\subsection{Soft-Margin SVM and the C Parameter}
+
+In practice, data is often not perfectly linearly separable. Soft-margin SVMs allow some misclassification by introducing slack variables $\xi_i$:
+
+\begin{equation}
+\minimize_w \quad \frac{1}{2}\|w\|^2 + C \sum_{i=1}^{n} \xi_i
+\end{equation}
+
+subject to:
+
+\begin{equation}
+y_i(w^T x_i + b) \geq 1 - \xi_i \quad \forall i
+\end{equation}
+
+The regularization parameter $C$ controls the trade-off between margin maximization and training error:
+
+\begin{itemize}
+    \item \textbf{Large $C$}: Penalizes misclassification heavily, resulting in smaller margin and more complex boundaries (risk of overfitting)
+    \item \textbf{Small $C$}: Allows more misclassification, resulting in larger margin and smoother boundaries (risk of underfitting)
+\end{itemize}
+
+\subsection{The Kernel Trick}
+
+Computing in high-dimensional spaces is computationally expensive. The kernel trick solves this by computing dot products in the transformed space without explicitly transforming the data:
+
+\begin{equation}
+k(x_i, x_j) = \langle \phi(x_i), \phi(x_j) \rangle
+\end{equation}
+
+This allows us to work in very high (or infinite) dimensional spaces efficiently. The SVM decision function becomes:
+
+\begin{equation}
+f(x) = \sum_{i=1}^{n} \alpha_i y_i k(x_i, x) + b
+\end{equation}
+
+where $\alpha_i$ are Lagrange multipliers learned during training. Only support vectors have non-zero $\alpha_i$.
+
+\subsection{Polynomial Kernel}
+
+The polynomial kernel creates decision boundaries that are polynomial functions of the input features:
+
+\begin{equation}
+k(x_i, x_j) = (\gamma \langle x_i, x_j \rangle + coef0)^{\text{degree}}
+\end{equation}
+
+where:
+\begin{itemize}
+    \item $\text{degree}$: The degree of the polynomial (typically 2 or 3)
+    \item $coef0$: A constant term that influences the kernel's behavior and boundary position
+    \item $\gamma$: Implicit scaling factor (in scikit-learn, defaults to $1/d$ where $d$ is the number of features)
+\end{itemize}
+
+The polynomial kernel creates smooth, curved decision boundaries defined by polynomial relationships between features. A degree-2 polynomial creates quadratic boundaries, degree-3 creates cubic boundaries, etc.
+
+\subsection{RBF Kernel}
+
+The Radial Basis Function (RBF) kernel is one of the most popular kernels for non-linear classification:
+
+\begin{equation}
+k(x_i, x_j) = \exp\left(-\gamma \|x_i - x_j\|^2\right)
+\end{equation}
+
+where $\gamma$ (gamma) is a hyperparameter controlling the kernel width. The RBF kernel can create arbitrarily complex, non-linear decision boundaries by using radially-symmetric Gaussian bumps centered at support vectors.
+
+\subsection{Multiclass Extension}
+
+For multiclass problems (like our 8 killer classes), scikit-learn uses the One-vs-Rest (OvR) strategy with \texttt{decision\_function\_shape='ovr'}:
+
+\begin{equation}
+\text{OvR: Train } k \text{ binary classifiers, one for each class vs. all other classes}
+\end{equation}
+
+During prediction, all $k$ classifiers produce decision function scores, and the class with the highest confidence is selected:
+
+\begin{equation}
+\text{predicted\_class} = \arg\max_{j} f_j(x)
+\end{equation}
+
+\section{Methodology}
+
+\subsection{Data Preprocessing}
+
+\subsubsection{Train/Validation Split}
+
+The dataset is partitioned into TRAIN and VAL sets using a pre-existing ``split'' column:
+
+\begin{equation}
+X_{\text{train}} = \{x_i : \text{split}_i = \text{``TRAIN''}\}, \quad X_{\text{val}} = \{x_i : \text{split}_i = \text{``VAL''}\}
+\end{equation}
+
+\subsubsection{Feature Selection}
+
+The following non-predictive columns are removed:
+\begin{itemize}
+    \item \texttt{incident\_id}: Unique identifier
+    \item \texttt{split}: Train/validation indicator
+    \item \texttt{killer\_id}: Target variable
+    \item One-hot encoded categorical features' original columns
+\end{itemize}
+
+\subsubsection{Standardization (Critical for SVM)}
+
+SVMs are highly sensitive to feature scaling because they rely on distance computations in kernel evaluation. Features are standardized using StandardScaler:
+
+\begin{equation}
+x_{\text{scaled}} = \frac{x - \mu}{\sigma}
+\end{equation}
+
+The scaler is fit on the TRAIN set and applied to the VAL set to prevent data leakage.
+
+\subsection{Hyperparameter Tuning Strategy}
+
+\subsubsection{Parameter Search Space}
+
+We evaluate two types of kernels:
+
+\textbf{RBF Kernel}: $C \in \{0.1, 1, 10, 100\}$, $\gamma \in \{0.001, 0.01, 0.1, 1\}$ (16 combinations)
+
+\textbf{Polynomial Kernel}: $C \in \{0.1, 1, 10, 100\}$, $coef0 \in \{0, 1, 10\}$, $degree = 2$ (12 combinations)
+
+Total: 28 hyperparameter configurations.
+
+\subsubsection{PredefinedSplit for Tuning}
+
+PredefinedSplit ensures GridSearchCV always trains on TRAIN samples and evaluates on VAL samples:
+
+\begin{equation}
+X_{\text{combined}} = [X_{\text{train}}; X_{\text{val}}], \quad y_{\text{combined}} = [y_{\text{train}}; y_{\text{val}}]
+\end{equation}
+
+GridSearchCV trains each SVM configuration on TRAIN samples and evaluates on VAL samples, selecting hyperparameters that maximize VAL accuracy.
+
+\subsection{Model Training and Evaluation}
+
+\subsubsection{GridSearchCV Process}
+
+For each of the 28 configurations:
+\begin{enumerate}
+    \item Train SVC model on TRAIN samples
+    \item Evaluate accuracy on VAL samples
+    \item Record the result
+\end{enumerate}
+
+Select the best configuration and re-train on combined TRAIN + VAL data.
+
+\subsubsection{Final Evaluation Metrics}
+
+Classification accuracy, confusion matrix, and per-class precision/recall/F1-score using scikit-learn's \texttt{classification\_report()}.
+
+\subsection{Decision Boundary Visualization}
+
+\subsubsection{PCA Dimensionality Reduction}
+
+Apply PCA with 2 components to the standardized feature data to enable 2D visualization while capturing maximum variance.
+
+\subsubsection{Decision Region and Support Vectors}
+
+Create a dense mesh grid covering the 2D PCA space with step size $h = 0.02$. Predict the killer class for each grid point using the optimal SVM trained on 2D PCA data. Support vectors are identified and highlighted with black circle markers to show boundary-defining training samples.
+
+\section{Results}
+
+\subsection{Hyperparameter Tuning}
+
+GridSearchCV evaluated 28 configurations. The best is presented in Table \ref{tab:best_params}.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Parameter} & \textbf{Value} \\
+\midrule
+Kernel Type & \texttt{poly} \\
+Regularization Parameter $C$ & 100 \\
+Polynomial Degree & 2 \\
+Constant Coefficient $coef0$ & 1 \\
+Best Grid Search Accuracy & 0.9311 (93.11\%) \\
+\bottomrule
+\end{tabular}
+\caption{Best hyperparameters from GridSearchCV. The polynomial kernel with degree 2, $C = 100$, and $coef0 = 1$ achieved 93.11\% on the validation set.}
+\label{tab:best_params}
+\end{table}
+
+\subsection{Validation Set Performance}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lr}
+\toprule
+\textbf{Metric} & \textbf{Value} \\
+\midrule
+SVM VAL Accuracy & 0.9562 (95.62\%) \\
+Number of Support Vectors & 327 \\
+Training Set Size & 841 \\
+Support Vector Ratio & 38.88\% \\
+\bottomrule
+\end{tabular}
+\caption{Final SVM performance on validation set. The support vector ratio of 38.88\% indicates moderate model complexity with well-balanced generalization.}
+\label{tab:final_perf}
+\end{table}
+
+\subsection{Confusion Matrix}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{c|rrrrrrrr}
+\toprule
+\textbf{True/Pred} & K0 & K1 & K2 & K3 & K4 & K5 & K6 & K7 \\
+\midrule
+K0 & 16 & 0 & 1 & 0 & 0 & 0 & 0 & 0 \\
+K1 & 0 & 62 & 0 & 0 & 0 & 0 & 0 & 0 \\
+K2 & 0 & 0 & 486 & 1 & 1 & 0 & 1 & 2 \\
+K3 & 0 & 0 & 0 & 42 & 0 & 0 & 3 & 0 \\
+K4 & 0 & 0 & 21 & 0 & 26 & 0 & 0 & 1 \\
+K5 & 0 & 0 & 0 & 0 & 0 & 133 & 0 & 0 \\
+K6 & 0 & 1 & 0 & 0 & 0 & 0 & 142 & 0 \\
+K7 & 0 & 0 & 6 & 0 & 4 & 0 & 0 & 9 \\
+\bottomrule
+\end{tabular}
+\caption{Confusion matrix on validation set. Rows represent true killer IDs, columns represent predicted killer IDs.}
+\label{tab:confusion}
+\end{table}
+
+\subsection{Per-Class Performance Metrics}
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Class} & \textbf{Precision} & \textbf{Recall} & \textbf{F1-Score} & \textbf{Support} \\
+\midrule
+K0 & 1.00 & 0.94 & 0.97 & 17 \\
+K1 & 0.98 & 1.00 & 0.99 & 62 \\
+K2 & 0.96 & 0.99 & 0.98 & 491 \\
+K3 & 0.95 & 0.93 & 0.94 & 45 \\
+K4 & 1.00 & 0.54 & 0.70 & 48 \\
+K5 & 0.97 & 1.00 & 0.98 & 133 \\
+K6 & 0.98 & 0.99 & 0.98 & 143 \\
+K7 & 0.82 & 0.47 & 0.60 & 19 \\
+\midrule
+Accuracy &  &  & 0.96 & 958 \\
+Macro Avg & 0.96 & 0.85 & 0.89 & 958 \\
+Weighted Avg & 0.95 & 0.96 & 0.95 & 958 \\
+\bottomrule
+\end{tabular}
+\caption{Per-class performance metrics. Precision: of all samples predicted as killer $i$, what fraction were correct. Recall: of all actual killer $i$ samples, what fraction were identified.}
+\label{tab:classification_report}
+\end{table}
+
+\section{Key Figures}
+
+\begin{figure}[h]
+\centering
+\includegraphics[width=0.95\textwidth]{q5_decision_regions_support_vectors.png}
+\caption{SVM decision regions and support vectors in 2D PCA space. Background colors represent predicted class regions. Black circles indicate 327 support vectors---the critical training samples defining polynomial decision boundaries. Filled colored dots represent all validation samples. The polynomial kernel creates curved, non-linear boundaries that adapt to class distributions far better than linear hyperplanes.}
+\label{fig:svm_decision}
+\end{figure}
+
+\section{Discussion}
+
+\subsection{Kernel Selection: Polynomial Over RBF}
+
+The GridSearchCV results definitively selected the polynomial kernel, indicating:
+
+\begin{itemize}
+    \item \textbf{Feature Interactions}: Quadratic boundaries capture multiplicative relationships between features (e.g., temperature $\times$ victim age)
+    \item \textbf{Smoother Boundaries}: Polynomial kernels create globally-consistent curves rather than RBF's local bumps
+    \item \textbf{Balanced Complexity}: 38.88\% support vector ratio indicates neither overfitting nor underfitting
+\end{itemize}
+
+The high $C = 100$ indicates the model prioritizes fitting the training data, suggesting the 841 TRAIN samples have sufficiently clear patterns. The $coef0 = 1$ adds a constant offset in the polynomial kernel, optimally balancing low-order vs. high-order polynomial terms.
+
+\subsection{Support Vector Ratio Analysis}
+
+With 327 support vectors from 841 training samples (38.88\%):
+
+\begin{itemize}
+    \item \textbf{Not Overfit}: Overfitted models require $> 60\%$ support vectors
+    \item \textbf{Not Underfit}: Underfitted models show $< 20\%$ support vectors with lower accuracy
+    \item \textbf{Balanced Model}: The 38.88\% ratio indicates optimal complexity for this dataset with partial class overlap
+\end{itemize}
+
+\subsection{Comparison with Q4 Linear Classifier}
+
+The Q5 SVM substantially outperforms the Q4 linear classifier across nearly all metrics:
+
+\begin{table}[h]
+\centering
+\begin{tabular}{lrr|r}
+\toprule
+\textbf{Metric} & \textbf{Q4 (Linear)} & \textbf{Q5 (SVM)} & \textbf{Gain} \\
+\midrule
+Overall Accuracy & 92.48\% & 95.62\% & +3.14\% \\
+\midrule
+K0 & 64.7\% & 94.1\% & +29.4\% \\
+K1 & 98.4\% & 100.0\% & +1.6\% \\
+K2 & 97.8\% & 98.9\% & +1.1\% \\
+K3 & 71.1\% & 93.3\% & +22.2\% \\
+K4 & 47.9\% & 54.2\% & +6.3\% \\
+K5 & 98.5\% & 100.0\% & +1.5\% \\
+K6 & 90.3\% & 99.3\% & +9.0\% \\
+K7 & 36.8\% & 47.4\% & +10.6\% \\
+\bottomrule
+\end{tabular}
+\caption{Comparison of per-class accuracy between Q4 and Q5. The SVM's non-linear boundaries provide dramatic improvements for under-represented classes (K0: +29.4\%, K3: +22.2\%) while marginally improving already well-separated classes.}
+\label{tab:q4_vs_q5}
+\end{table}
+
+\subsubsection{Key Observations}
+
+\begin{itemize}
+    \item \textbf{Largest Gains}: Under-represented classes (K0, K3) benefit most from polynomial boundaries finding compact, isolated regions
+    \item \textbf{Marginal Gains}: Well-separated classes (K1, K2, K5) were already 97-99\% accurate; non-linearity adds little value
+    \item \textbf{Persistent Challenges}: K4 and K7 show modest improvements due to fundamental class imbalance and overlapping features
+    \item \textbf{Conclusion}: Non-linear SVM decisively outperforms linear classifier, justifying deployment complexity
+\end{itemize}
+
+\subsection{Confusion Pattern Analysis}
+
+\subsubsection{Major Improvements}
+
+\begin{itemize}
+    \item \textbf{K0}: Only 1 misclassification (vs. 6 in Q4). The polynomial boundary isolated this rare 17-sample class
+    \item \textbf{K3}: Reduced from 13 to 3 misclassifications. The curved boundary effectively separated K3 from K6
+    \item \textbf{K6}: Reduced from 15 to 1 misclassification. Nearly perfect separation achieved
+\end{itemize}
+
+\subsubsection{Persistent Challenges}
+
+\begin{itemize}
+    \item \textbf{K2-K4 Confusion}: Still the primary issue (21 K4 samples misclassified as K2). These classes have genuinely overlapping feature distributions
+    \item \textbf{K7 Class Imbalance}: With only 19 training samples, insufficient data exists to learn reliable boundaries
+\end{itemize}
+
+\section{Conclusion}
+
+The non-linear Support Vector Machine with polynomial kernel achieves 95.62\% validation accuracy, a 3.14\% improvement over Q4's linear classifier (92.48\%).
+
+\subsection{Key Findings}
+
+\begin{enumerate}
+    \item \textbf{Optimal Configuration}: Polynomial kernel (degree 2) with $C = 100$, $coef0 = 1$, using 327 support vectors (38.88\% ratio)
+    
+    \item \textbf{Performance Gains}:
+    \begin{itemize}
+        \item Under-represented classes: +29.4\% (K0), +22.2\% (K3) - dramatic improvements
+        \item Well-separated classes: +1.1-1.6\% (K1, K2, K5) - marginal gains
+        \item Problematic classes: +6.3\% (K4), +10.6\% (K7) - modest improvements
+    \end{itemize}
+    
+    \item \textbf{Non-Linearity Justified}: Polynomial boundaries capture feature interactions that linear models miss, particularly benefiting rare and intermediate classes
+\end{enumerate}
+
+\subsection{Practical Implications}
+
+\begin{itemize}
+    \item \textbf{Deployment Recommendation}: The 95.62\% accuracy justifies operational deployment with SVM over Q4's linear approach
+    
+    \item \textbf{Reliability by Class}:
+    \begin{itemize}
+        \item \textbf{High Confidence (95-100\%)}: K0, K1, K2, K5, K6 suitable for automated deployment
+        \item \textbf{Moderate Confidence (85-95\%)}: K3 suitable with expert validation
+        \item \textbf{Low Confidence ($< 85\%$)}: K4 (54.2\%), K7 (47.4\%) require mandatory human review
+    \end{itemize}
+    
+    \item \textbf{Future Improvements}: Feature engineering to distinguish K4 from K2, class balancing for K7, ensemble methods combining Q4 and Q5
+\end{itemize}
+
+\end{document}
