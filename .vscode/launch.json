@@ -1,10 +1,17 @@
 {
     "configurations": [
         {
-            "name": "Debug Project",
+            "name": "Debug src.q1",
             "type": "debugpy",
             "request": "launch",
-            "program": "${workspaceFolder}/src/code.py"
-        }
+            "module": "src.q1",
+            "cwd": "${workspaceFolder}"
+        },
+        {
+            "name": "Debug Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}"
+        },
     ]
 }
