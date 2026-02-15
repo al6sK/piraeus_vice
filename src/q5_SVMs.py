@@ -124,19 +124,6 @@ print(f"SVM VAL Accuracy: {accuracy_val:.4f}")
 print("Confusion Matrix:") 
 print(conf_mtrx)
 
-
-# # Opening Q4 JSON data
-# try:
-#     with open("q4_results.json", "r") as f:
-#         q4_data = json.load(f)
-    
-#     sgd_acc = q4_data["accuracy"]
-#     diff = accuracy_val - sgd_acc
-
-# except FileNotFoundError:
-#     print("Run q4.py first to store results")
-
-
 # ----------------------------------------------------------
 # Q4.5 - Decision Regions & Support Vectors Visualization 
 # ----------------------------------------------------------

@@ -11,8 +11,12 @@ from sklearn.decomposition import PCA
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import SGDClassifier
 from sklearn.multiclass import OneVsRestClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer
+from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer, ConfusionMatrixDisplay
 from sklearn.model_selection import GridSearchCV
+
+project_dir = Path(__file__).resolve().parent.parent
+plots_path = project_dir / "plots/Q4"
+plots_path.mkdir(parents=True, exist_ok=True)
 
 # --------------------------------------------------------------------------------------------------
 # a) Train the linear classifier on TRAIN (and choose any regularisation hyperparameters using VAL).
@@ -136,6 +140,22 @@ conf_mtrx = confusion_matrix(y_val, y_val_pred)
 print("Confusion Matrix:") 
 print(conf_mtrx)
 
+# --------------------------------------------------------------
+# Confusion Matrix Calculation
+# --------------------------------------------------------------
+cm = confusion_matrix(y_val, y_val_pred)
+
+labels = final_model.classes_
+_, ax = plt.subplots(figsize=(10, 8))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+disp.plot(ax=ax)
+
+ax.set_title("Confusion matrix for Linear classifier")
+ax.set_xlabel("Predicted categories")
+ax.set_ylabel("Actual categories")
+
+plt.savefig(str(plots_path / "Confusion_matrix_for_Linear_classifier.png"), dpi=300, bbox_inches="tight")
+plt.close()
 # --------------------------------------------------------------------------------------------------
 # In the 2D PCA projection used in Q3, overlay the approximate linear decision boundaries.
 # --------------------------------------------------------------------------------------------------

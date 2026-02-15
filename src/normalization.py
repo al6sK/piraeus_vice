@@ -24,12 +24,13 @@ numeric_feats = [
 ]
 # print(data[numeric_feats].head(5))
 
-# keep only 2 decimal digits max for each numeric feature
-for i in numeric_feats:
-    data[i] = data[i].round(2) 
 
 scaler = MinMaxScaler()
 data[numeric_feats] = scaler.fit_transform(data[numeric_feats])
+
+# keep only 3 decimal digits max for each numeric feature
+for i in numeric_feats:
+    data[i] = data[i].round(3)
 
 # print(data[numeric_feats].head(5))
 
@@ -39,8 +40,9 @@ data[numeric_feats] = scaler.fit_transform(data[numeric_feats])
 categorical_feats = [
     "weapon_code",
     "scene_type",
-    "weather"
+    "weather",
 ]
+# print(data[categorical_feats].head(5))
 
 # Creating the encoder
 encoder = OneHotEncoder(handle_unknown='ignore', sparse_output=False)
@@ -54,6 +56,5 @@ encoded_df = pd.DataFrame(
 
 # join new columns 
 data = pd.concat([data, encoded_df],axis=1)
-
 # save to .csv
-data.to_csv( projectDir / "data" / "data_encoded.csv", index=False)
+data.to_csv( projectDir / "data" /'data_encoded.csv', index=False)
