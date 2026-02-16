@@ -1,11 +1,9 @@
 from pathlib import Path
 import numpy as np
-import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.patches import Ellipse
+import pandas as pd
 from scipy.stats import multivariate_normal
-from data.loader import DataLoader, Filter
 
 CONTINUOUS_FEATURES = [
     "hour_float",
@@ -18,189 +16,146 @@ CONTINUOUS_FEATURES = [
     "pop_density",
 ]
 
-PROJECTION_PAIRS = [("latitude", "longitude"), ("latitude", "hour_float")]
+# ----------------------------------------------------------------------------------------------------------------------------
+# setup_paths and split data 
+# ----------------------------------------------------------------------------------------------------------------------------
+project_dir = Path(__file__).resolve().parent.parent
 
+plots_path = project_dir / "plots/Q2"
+plots_path.mkdir(parents=True, exist_ok=True)
 
-def setup_paths():
-    project_dir = Path(__file__).resolve().parent.parent
-    plots_path = project_dir / "plots"
+emp_corr_path = plots_path / "empirical_covariance"
+emp_corr_path.mkdir(parents=True, exist_ok=True)
 
-    q2_path = plots_path / "q2_mle"
-    covariance_path = q2_path / "covariance_heatmaps"
-    correlation_path = q2_path / "correlation_heatmaps"
-    ellipse_path = q2_path / "ellipse_projections"
+corr_matrix_path = plots_path / "correlation_matrix"
+corr_matrix_path.mkdir(parents=True, exist_ok=True)
 
-    for path in [covariance_path, correlation_path, ellipse_path]:
-        path.mkdir(parents=True, exist_ok=True)
+data = pd.read_csv("data/crimes.csv")
+data = data[CONTINUOUS_FEATURES + ["split", "killer_id"]]
 
-    return covariance_path, correlation_path, ellipse_path
+train_data = data[data["split"] == "TRAIN"]
+train_data = train_data.drop(columns=["split"])
 
+print(train_data.columns)
+# ----------------------------------------------------------------------------------------------------------------------------
+# Find for each killer the number of incidents N_k
+# ----------------------------------------------------------------------------------------------------------------------------
+N_k = []
+for i in range(8):
+    N_k.append(len(train_data[train_data["killer_id"] == i + 1]))
+print(N_k)
+# ----------------------------------------------------------------------------------------------------------------------------
+# a) Derive the Maximum Likelihood Estimators
+# ----------------------------------------------------------------------------------------------------------------------------
+M_k = []
+for i in range(8):
+    killer_incidents = train_data[train_data["killer_id"] == i + 1]
 
-def compute_mle_gaussian(data: np.ndarray):
-    mu = data.mean(axis=0)
-    centered = data - mu
-    # division by N for MLE
-    sigma = (centered.T @ centered) / len(data)
-    return mu, sigma
+    mean = []
+    for x in CONTINUOUS_FEATURES:
+        mean.append(killer_incidents[x].mean())
+    M_k.append(mean)
+print(M_k)
 
+S_k = []
+for i in range(8):
+    killer_incidents = train_data[train_data["killer_id"] == i + 1]
 
-def verify_mle(data: np.ndarray, mu: np.ndarray, sigma: np.ndarray):
-    reg = 1e-6 * np.eye(len(mu))
-    sigma_reg = sigma + reg
+    Covariance_Matrix = ( (killer_incidents[CONTINUOUS_FEATURES].values - M_k[i]).T ) @ (killer_incidents[CONTINUOUS_FEATURES].values - M_k[i]) / N_k[i]
 
-    rv = multivariate_normal(mean=mu, cov=sigma_reg, allow_singular=True)
-    our_ll = rv.logpdf(data).sum()
+    S_k.append(Covariance_Matrix)
+print(S_k)
+# ----------------------------------------------------------------------------------------------------------------------------
+# b) Verify numerically that the log-likelihood produced by your estimates matches (up to numerical tolerance) that of a trusted library.
+# ----------------------------------------------------------------------------------------------------------------------------
+for i in range(8):
+    X = train_data[train_data["killer_id"] == i + 1][CONTINUOUS_FEATURES].values
+    my_pdf = multivariate_normal.logpdf(X, mean=M_k[i], cov=S_k[i], allow_singular=True)
+    my_log_likelihood = np.sum(my_pdf)
 
-    lib_mu = data.mean(axis=0)
-    # numpy cov normalized by N-1 by default, so we disable bias correction for N-normalization comparison
-    # wait, actually numpy cov(bias=True) normalizes by N.
-    lib_sigma = np.cov(data, rowvar=False, bias=True) + reg
+    lib_mean = np.mean(X, axis=0)
+    lib_cov = np.cov(X, rowvar=False, bias=True) 
+    lib_pdf = multivariate_normal.logpdf(X, mean=lib_mean, cov=lib_cov, allow_singular=True)
+    lib_log_likelihood = np.sum(lib_pdf)
 
-    lib_ll = (
-        multivariate_normal(mean=lib_mu, cov=lib_sigma, allow_singular=True)
-        .logpdf(data)
-        .sum()
-    )
+    print(f"My LL: {my_log_likelihood}")
+    print(f"Lib LL: {lib_log_likelihood}")
+# ----------------------------------------------------------------------------------------------------------------------------
+# c) Visualise, for each killer k
+# -   -   -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    -    - 
+# Empirical Covariance
+# ----------------------------------------------------------------------------------------------------------------------------
+for i in range(8):    
+    # Calculate the correlation matrix
+    corr = S_k[i].round(2)
 
-    return np.abs(our_ll - lib_ll) < 1e-6, our_ll
+    # Create the mask for the upper triangle
+    mask = np.triu(np.ones_like(corr, dtype=bool))
 
-
-def plot_covariance_heatmap(sigma: np.ndarray, killer_id: int, save_path: Path):
-    plt.figure(figsize=(10, 8))
-    sns.heatmap(
-        sigma,
-        xticklabels=CONTINUOUS_FEATURES,
-        yticklabels=CONTINUOUS_FEATURES,
-        annot=True,
-        fmt=".2f",
-        cmap="RdBu_r",
-        center=0,
-        square=True,
-        linewidths=0.5,
-    )
-    plt.title(f"Covariance Matrix for Killer {killer_id}")
-    plt.xticks(rotation=45, ha="right")
-    plt.tight_layout()
-    plt.savefig(
-        save_path / f"covariance_killer_{killer_id}.png", dpi=300, bbox_inches="tight"
-    )
-    plt.close()
-
-
-def plot_correlation_heatmap(sigma: np.ndarray, killer_id: int, save_path: Path):
-    std_devs = np.sqrt(np.diag(sigma))
-    std_devs = np.where(std_devs == 0, 1e-10, std_devs)
-    corr = np.nan_to_num(sigma / np.outer(std_devs, std_devs), nan=0.0)
-
-    plt.figure(figsize=(10, 8))
+    # Create the heatmap with the mask
+    plt.figure(figsize=(10, 10))
     sns.heatmap(
         corr,
-        xticklabels=CONTINUOUS_FEATURES,
-        yticklabels=CONTINUOUS_FEATURES,
+        cmap="coolwarm",
         annot=True,
         fmt=".2f",
-        cmap="RdBu_r",
-        center=0,
-        vmin=-1,
-        vmax=1,
-        square=True,
         linewidths=0.5,
+        vmin=-1,
+        vmax=1,  # Ensure that color scaling is consistent
+        cbar_kws={"label": "Correlation Coefficient"},
+        annot_kws={"size": 10},  # Adjust annotation size
+        xticklabels=CONTINUOUS_FEATURES, 
+        yticklabels=CONTINUOUS_FEATURES, 
+        mask=mask,  # Apply the mask to hide the upper triangle
     )
-    plt.title(f"Correlation Matrix for Killer {killer_id}")
+
+    # Title and labels for context
+    plt.title("Empirical Covariance Matrix of Numerical Features", fontsize=16, fontweight="bold")
+    plt.xlabel("Features", fontsize=12)
+    plt.ylabel("Features", fontsize=12)
+
+    # Rotate the axis labels for better readability
     plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0, ha="right")
+
     plt.tight_layout()
-    plt.savefig(
-        save_path / f"correlation_killer_{killer_id}.png", dpi=300, bbox_inches="tight"
+    plt.savefig(emp_corr_path / f"emp_corr_of_killer_{i+1}.png", dpi=300, bbox_inches="tight")
+# ----------------------------------------------------------------------------------------------------------------------------
+# correlation matrix
+# ----------------------------------------------------------------------------------------------------------------------------
+for i in range(8):
+    variances = np.diag(S_k[i])
+    std_devs = np.sqrt(variances)
+    std_devs[std_devs == 0] = 1e-15
+    corr = (S_k[i] / np.outer(std_devs, std_devs)).round(2)
+    # Create the mask for the upper triangle
+    mask = np.triu(np.ones_like(corr, dtype=bool))
+
+    # Create the heatmap with the mask
+    plt.figure(figsize=(10, 10))
+    sns.heatmap(
+        corr,
+        cmap="coolwarm",
+        annot=True,
+        fmt=".2f",
+        linewidths=0.5,
+        vmin=-1,
+        vmax=1,  # Ensure that color scaling is consistent
+        cbar_kws={"label": "Correlation Coefficient"},
+        annot_kws={"size": 10},  # Adjust annotation size
+        xticklabels=CONTINUOUS_FEATURES, 
+        yticklabels=CONTINUOUS_FEATURES, 
+        mask=mask,  # Apply the mask to hide the upper triangle
     )
-    plt.close()
 
+    # Title and labels for context
+    plt.title("Correlation Matrix of Numerical Features", fontsize=16, fontweight="bold")
+    plt.xlabel("Features", fontsize=12)
+    plt.ylabel("Features", fontsize=12)
 
-def plot_ellipse(ax, mu, sigma, c_k, color):
-    eigvals, eigvecs = np.linalg.eigh(sigma)
-    width, height = 2 * np.sqrt(c_k * eigvals)
-    angle = np.degrees(np.arctan2(eigvecs[1, 0], eigvecs[0, 0]))
+    # Rotate the axis labels for better readability
+    plt.xticks(rotation=45, ha="right")
+    plt.yticks(rotation=0, ha="right")
 
-    ellipse = Ellipse(
-        xy=tuple(mu),
-        width=width,
-        height=height,
-        angle=angle,
-        facecolor="none",
-        edgecolor=color,
-        linewidth=2,
-    )
-    ax.add_patch(ellipse)
-
-
-def plot_2d_ellipse(
-    df_train: pd.DataFrame, killer_ids, feat_x: str, feat_y: str, save_path: Path
-):
-    plt.figure(figsize=(12, 10))
-    ax = plt.gca()
-    colors = plt.colormaps["tab10"](np.linspace(0, 1, len(killer_ids)))
-
-    for idx, kid in enumerate(killer_ids):
-        data_k = df_train.loc[df_train["killer_id"] == kid, [feat_x, feat_y]].values
-        if len(data_k) < 3:
-            continue
-
-        mu, sigma = compute_mle_gaussian(data_k)
-        sigma_inv = np.linalg.inv(sigma + 1e-6 * np.eye(2))
-
-        mahal = np.array([(x - mu) @ sigma_inv @ (x - mu) for x in data_k])
-        c_k = mahal.max()
-
-        ax.scatter(
-            data_k[:, 0],
-            data_k[:, 1],
-            c=[colors[idx]],
-            alpha=0.6,
-            s=30,
-            label=f"Killer {kid}",
-        )
-        ax.scatter(mu[0], mu[1], c=[colors[idx]], s=150, marker="X", edgecolor="black")
-        plot_ellipse(ax, mu, sigma, c_k, colors[idx])
-
-    ax.set_xlabel(feat_x)
-    ax.set_ylabel(feat_y)
-    ax.set_title(f"2D Projection: {feat_x} vs {feat_y}")
-    ax.legend()
-    ax.grid(True, alpha=0.3)
     plt.tight_layout()
-    plt.savefig(
-        save_path / f"ellipse_{feat_x}_vs_{feat_y}.png", dpi=300, bbox_inches="tight"
-    )
-    plt.close()
-
-
-def q2():
-    covariance_path, correlation_path, ellipse_path = setup_paths()
-
-    dataloader = DataLoader()
-    df_train = dataloader.split_filter(Filter.TRAIN)
-    killer_ids = sorted(df_train["killer_id"].unique())
-
-    mle_estimates = {}
-
-    for kid in killer_ids:
-        data_k = df_train.loc[df_train["killer_id"] == kid, CONTINUOUS_FEATURES].values
-        mu_k, sigma_k = compute_mle_gaussian(data_k)
-        is_valid, our_ll = verify_mle(data_k, mu_k, sigma_k)
-
-        status = "PASS" if is_valid else "FAIL"
-        print(f"Killer {kid}: N={len(data_k)}, LogLikelihood={our_ll:.2f}, {status}")
-        mle_estimates[kid] = {"mu": mu_k, "sigma": sigma_k}
-
-    for kid in killer_ids:
-        sigma_k = mle_estimates[kid]["sigma"]
-        plot_covariance_heatmap(sigma_k, kid, covariance_path)
-        plot_correlation_heatmap(sigma_k, kid, correlation_path)
-
-    for feat_x, feat_y in PROJECTION_PAIRS:
-        plot_2d_ellipse(df_train, killer_ids, feat_x, feat_y, ellipse_path)
-
-    return mle_estimates
-
-
-if __name__ == "__main__":
-    q2()
+    plt.savefig(corr_matrix_path / f"corr_matrix_of_killer_{i+1}.png", dpi=300, bbox_inches="tight")

@@ -13,14 +13,14 @@ numeric_feats_for_plot = [
     "longitude"         
 ]
 
+# ----------------------------------------------------------------------------------------------------------------------------
+# setup_paths and split data 
+# ----------------------------------------------------------------------------------------------------------------------------
 project_dir = Path(__file__).resolve().parent.parent
 plots_path = project_dir / "plots/Q1"
 features_path = plots_path / "distributions_histplots"
 features_path.mkdir(parents=True, exist_ok=True)
 
-# ----------------------------------------------------------------------------------------------------------------------------
-# setup_paths and split data 
-# ----------------------------------------------------------------------------------------------------------------------------
 data = pd.read_csv("data/crimes.csv")
 data = data[data["split"] != "TEST"]
 
