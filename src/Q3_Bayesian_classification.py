@@ -19,7 +19,6 @@ CONTINUOUS_FEATURES = [
     "pop_density",
 ]
 
-
 def setup_paths():
     project_dir = Path(__file__).resolve().parent.parent
     plots_path = project_dir / "plots"
