@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from pathlib import Path
 from keras import layers, models, callbacks
+from keras.callbacks import EarlyStopping, ReduceLROnPlateau
 from sklearn.metrics import f1_score
 import matplotlib.pyplot as plt
 import os
@@ -41,7 +42,13 @@ y = data["killer_id"]
 # --------------------------------------------------
 # MLP
 # --------------------------------------------------
-
+reduce_lr = ReduceLROnPlateau(
+    monitor='val_loss', 
+    factor=0.55,   # 0.55 
+    patience=40,       
+    min_lr=0.00001,  
+    verbose=1
+)
 # best : 
 # 12->12->8     :   Weighted F1 score: 0.948 Accuracy: 0.948
 
@@ -49,13 +56,17 @@ class FC_MNIST(models.Model):
     def __init__(self):
         super(FC_MNIST, self).__init__()
         # Creating layers in the initializer
-        self.fc1 = layers.Dense(units=12, activation="relu")   
-        self.fc2 = layers.Dense(units=12, activation="relu")          
+        self.fc1 = layers.Dense(units=64, activation="relu")#64
+        self.dropout = layers.Dropout(0.2)   
+        self.fc2 = layers.Dense(units=16, activation="relu")#16
+        self.fc3 = layers.Dense(units=16, activation="relu")            
         self.fc4 = layers.Dense(units = 8, activation="softmax")  # Output layer
-    def call(self, input_tensor):
+    def call(self, input_tensor, training=False):
         # Pass input_tensor through the layers sequentially
         x = self.fc1(input_tensor)
+        x = self.dropout(x, training=training)
         x = self.fc2(x)
+        x = self.fc3(x)
         return self.fc4(x)
     
 # Create the input layer
@@ -69,16 +80,20 @@ model.summary(expand_nested=True)
 #encode y
 y_onehot = pd.get_dummies(pd.Series(y[ix_train])).values 
 y_dev_onehot = pd.get_dummies(pd.Series(y[ix_dev])).values
-callback = callbacks.EarlyStopping(monitor="val_loss", patience = 30, restore_best_weights=True)
 
+callback = EarlyStopping(
+    monitor='val_loss', 
+    patience=150, 
+    restore_best_weights=True,
+    )
 model.compile(optimizer = "adam", loss="categorical_crossentropy", metrics=["accuracy"])
 
 model_hist = model.fit(
     X.iloc[ix_train],
     y_onehot,
-    epochs=200,
+    epochs=2000,
     validation_data=(X.iloc[ix_dev], y_dev_onehot),
-    callbacks=[callback],
+    callbacks=[callback,reduce_lr],
 )
 
 # --------------------------------------------------
@@ -146,7 +161,6 @@ plt.savefig(str(featuresPath / "Confusion_matrix_for_Neural_Network_Plot.png"), 
 # --------------------------------------------------
 #  Estimate how much the classifier relies on each feature 
 # --------------------------------------------------
-
 numeric_features = [
     'hour_float',
     'latitude', 
@@ -164,107 +178,93 @@ encoded_features = [
     ['weather_0', 'weather_1', 'weather_2', 'weather_3', 'weather_4']
     ]
 
-feature_accuracy = pd.DataFrame(columns=["Weighted_F1_score", "Accuracy"])
-
-def predict_with_MLP(data):
-    y_pred_probs = model.predict(X.iloc[ix_test])
+def get_score_on_val(dataset_X):
+    val_X_subset = dataset_X.iloc[ix_dev]
+    y_pred_probs = model.predict(val_X_subset, verbose=0)
     y_pred_int = y_pred_probs.argmax(axis=1)
-    y_true_int = y_test_onehot.argmax(axis=1)
+    y_true_int = y_dev_onehot.argmax(axis=1)
 
     score = f1_score(y_true_int, y_pred_int, average="weighted")
     acc = accuracy_score(y_true_int, y_pred_int)
+    return score, acc
 
-    #return pd.DataFrame([{"Weighted_F1_score": score, "Accuracy": acc}])
-    return score , acc
+base_f1, base_acc = get_score_on_val(X)
+print(f"Baseline VAL F1: {base_f1:.4f}")
 
+feature_accuracy = []
 
-
-suffle_times = 1
-temp_X = X
-for j in numeric_features:
-    accuracy = []
-    for i in range(suffle_times):
-        temp_X = X
-        # randomly shuffle only the j-th column
-        temp_X[j] = temp_X[j].sample(frac=1).reset_index(drop=True).reset_index(drop=True)#, random_state=42).reset_index(drop=True)
-
-        score , acc = predict_with_MLP(temp_X)
-        accuracy.append([score , acc])
+for feature in numeric_features:
+    temp_X = X.copy()
     
-    score = acc = 0
-    for item in accuracy:
-        score += float(item[0])
-        acc += float(item[1])
-    score = score/len(accuracy)
-    acc = acc/len(accuracy)
+    shuffled_col = temp_X[feature].sample(frac=1, random_state=42).values
+    temp_X[feature] = shuffled_col
 
-    new_row = pd.DataFrame([{"Weighted_F1_score": score, "Accuracy": acc}])
+    score, acc = get_score_on_val(temp_X)
     
-    # add data to df
-    feature_accuracy = pd.concat([feature_accuracy, new_row], ignore_index=True)
-
-for j in encoded_features:
-    accuracy = []
-    for i in range(suffle_times):    
-        temp_X = X
-        # randomly shuffle encoded data
-        temp_X[j] = temp_X[j].apply(lambda row: np.random.permutation(row), axis=1, result_type='expand')
-
-        score , acc = predict_with_MLP(temp_X)
-        accuracy.append([score , acc])
+    importance_f1 = base_f1 - score
+    importance_acc = base_acc - acc
     
-    score = acc = 0
-    for item in accuracy:
-        score += float(item[0])
-        acc += float(item[1])
-    score = score/len(accuracy)
-    acc = acc/len(accuracy)
-            
-    new_row = pd.DataFrame([{"Weighted_F1_score": score, "Accuracy": acc}])
+    feature_accuracy.append({
+        "Feature": feature, 
+        "Weighted_F1_Drop": importance_f1, 
+        "Accuracy_Drop": importance_acc,
+        "Type": "Numeric"
+    })
+
+for feature_group in encoded_features:
+    group_name = feature_group[0].rsplit('_', 1)[0]
     
-    # add data to df
-    feature_accuracy = pd.concat([feature_accuracy, new_row], ignore_index=True)
+    temp_X = X.copy()
+    
+    shuffled_block = temp_X[feature_group].sample(frac=1, random_state=42).values
+    temp_X[feature_group] = shuffled_block
 
-feature_accuracy["Weighted_F1_score"] = base_score - feature_accuracy["Weighted_F1_score"]
-feature_accuracy["Accuracy"] = base_score - feature_accuracy["Accuracy"] 
+    score, acc = get_score_on_val(temp_X)
+    
+    importance_f1 = base_f1 - score
+    importance_acc = base_acc - acc
+    
+    feature_accuracy.append({
+        "Feature": group_name, 
+        "Weighted_F1_Drop": importance_f1, 
+        "Accuracy_Drop": importance_acc,
+        "Type": "Categorical"
+    })
 
-catergorical_names = [
-    "weapon_code",
-    "scene_type",
-    "weather"
-]
+df_importance = pd.DataFrame(feature_accuracy)
+df_importance = df_importance.sort_values(by="Accuracy_Drop", ascending=False)
 
-features_names = numeric_features + catergorical_names
-feature_accuracy.index = pd.Index(features_names, dtype="category")
+print(df_importance)
 
-feature_accuracy = feature_accuracy.sort_values(by="Weighted_F1_score", ascending=False)
-
-# Round up values to 4 digits
-feature_accuracy["Weighted_F1_score"] = feature_accuracy["Weighted_F1_score"].round(4)
-feature_accuracy["Accuracy"] = feature_accuracy["Accuracy"].round(4)
-
-# --------------------------------------------------
-#  Rank and plot a bar chart of the top 5 most important features
-# --------------------------------------------------
-print(feature_accuracy)
-
-colors = [
-    "red" if category in catergorical_names else "blue"
-    for category in feature_accuracy.index
-]
-
-fig, ax = plt.subplots(figsize=(8, 6))
-bars = plt.bar(feature_accuracy.index, feature_accuracy["Accuracy"], color=colors)
-
-plt.xlabel("Categories")
-plt.ylabel("Accuracy")
-plt.title("Accuracy Ranking (large positive indicates that the feature is crucial for correct classification)")
-plt.xticks(rotation=45)
-
-ax.grid(True, linestyle="--", alpha=0.6)
-# Προσθήκη τιμών πάνω από τις μπάρες
-for bar in bars:
-    height = bar.get_height()
-    plt.text(bar.get_x() + bar.get_width()/2, height, f'{height:.4f}', ha='center', va='bottom')
+top_5 = df_importance.head(5)
+colors = ["red" if t == "Categorical" else "blue" for t in top_5["Type"]]
+plt.figure(figsize=(10, 6))
+bars = plt.bar(top_5["Feature"], top_5["Accuracy_Drop"], color=colors)
+plt.title("Top 5 Feature Importance", fontsize=16, fontweight="bold")
+plt.ylabel("Drop in Accuracy")
+plt.xlabel("Feature")
 plt.tight_layout()
-plt.savefig(str(featuresPath / "Accuracy Ranking.png"), dpi=300, bbox_inches="tight")
+plt.savefig(str(featuresPath / "Feature_Importance.png"), dpi=300, bbox_inches="tight")
+# --------------------------------------------------
+# Generate Submission CSV (VAL + TEST) - CORRECTED
+# --------------------------------------------------
+ix_submission = np.sort(np.concatenate((ix_dev, ix_test)))
+X_submission = X.iloc[ix_submission]
+
+y_pred_probs_sub = model.predict(X_submission)
+y_pred_classes_sub = y_pred_probs_sub.argmax(axis=1) + 1
+
+results = pd.DataFrame()
+
+original_data = pd.read_csv(str(dataPath)) 
+results["incident_id"] = original_data.iloc[ix_submission]["incident_id"].values
+
+results["predicted_killer"] = y_pred_classes_sub
+
+for i in range(8):
+    results[f"p_killer_{i+1}"] = y_pred_probs_sub[:, i]
+
+predictions_path = projectDir / "data/predictions"
+predictions_path.mkdir(parents=True, exist_ok=True)
+
+results.to_csv(predictions_path / "MLP_pred.csv", index=False)

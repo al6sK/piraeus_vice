@@ -1,18 +1,17 @@
 import pandas as pd
 import numpy as np
-import seaborn as sns
-
 from pathlib import Path
 import matplotlib.pyplot as plt
-from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
-
 from sklearn.decomposition import PCA
 from sklearn.naive_bayes import GaussianNB
 from sklearn.linear_model import SGDClassifier
 from sklearn.multiclass import OneVsRestClassifier
 from sklearn.metrics import accuracy_score, confusion_matrix, make_scorer, ConfusionMatrixDisplay
 from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import PredefinedSplit
+from matplotlib.lines import Line2D
+from matplotlib.patches import Patch
 
 project_dir = Path(__file__).resolve().parent.parent
 plots_path = project_dir / "plots/Q4"
@@ -46,6 +45,14 @@ x_val = x[val_data.values]
 y_val = y_labels[val_data.values]
 y_val_onehot = y_onehot[val_data.values]
 
+x_full = np.vstack((x_train, x_val))
+y_full = np.concatenate((y_train, y_val))
+
+test_fold = np.zeros(x_full.shape[0])
+test_fold[:len(x_train)] = -1 
+test_fold[len(x_train):] = 0  
+
+ps = PredefinedSplit(test_fold)
 # SSE Scorer Function
 def sse_scorer(estimator, x, y):
 
@@ -99,13 +106,13 @@ grid_search = GridSearchCV(
     param_grid = param_grid,
     scoring = scorers,
     refit = 'Accuracy',
-    cv = 5, 
+    cv = ps,
     verbose = 1,
     return_train_score = False
 )
 
 # Model Training on TRAIN set
-grid_search.fit(x_train, y_train)
+grid_search.fit(x_full, y_full)
 
 # Results
 print("\nHyperparameter Tuning Results with GridSearchCV:\n")
@@ -120,8 +127,19 @@ print(f"Minimum SSE: {min_sse:.4f}")
 # --------------------------------------------------------------------------------------------------
 # Report VAL accuracy and confusion matrix. Compare with Q3
 # --------------------------------------------------------------------------------------------------
-final_model = grid_search.best_estimator_
+best_params = grid_search.best_params_
+best_alpha = best_params['estimator__alpha']
 
+final_model = OneVsRestClassifier(
+    SGDClassifier(
+        loss="log_loss",
+        alpha=best_alpha,
+        penalty="l2",
+        max_iter=1000,
+        random_state=42
+    )
+)
+final_model.fit(x_train, y_train)
 # Predictions
 y_val_pred = final_model.predict(x_val)
 y_val_proba = final_model.predict_proba(x_val)
@@ -156,67 +174,97 @@ ax.set_ylabel("Actual categories")
 
 plt.savefig(str(plots_path / "Confusion_matrix_for_Linear_classifier.png"), dpi=300, bbox_inches="tight")
 plt.close()
+
 # --------------------------------------------------------------------------------------------------
-# In the 2D PCA projection used in Q3, overlay the approximate linear decision boundaries.
+# c) Overlay approximate linear decision boundaries on PCA projection
 # --------------------------------------------------------------------------------------------------
 
-# Q3 Dummy Data for PCA 
-pca = PCA(n_components=2)
-x_pca = pca.fit_transform(x)
-y_pca = y_labels
-
-x_pca_train = x_pca[train_data.values]
-y_pca_train = y_pca[train_data.values]
-x_pca_val = x_pca[val_data.values]
-y_pca_val = y_pca[val_data.values]
-
-# Q4 - Logistic Regression for best model found
-final_model.fit(x_pca_train, y_pca_train)
-
-# Q3 - Naive Bayes Model
-gnb_model = GaussianNB()
-gnb_model.fit(x_pca_train, y_pca_train)
-
-# Decision Boundary Visualization
-
-# Mesh Creation
-h = 0.05  # step size in the mesh
-x_min, x_max = x_pca[:, 0].min() - 0.5, x_pca[:, 0].max() + 0.5
-y_min, y_max = x_pca[:, 1].min() - 0.5, x_pca[:, 1].max() + 0.5
-xx, yy = np.meshgrid(np.arange(x_min, x_max, h),
-                     np.arange(y_min, y_max, h))
-
-x_mesh = np.c_[xx.ravel(), yy.ravel()]
-
-# Linear predictions
-z_linear = final_model.predict(x_mesh).reshape(xx.shape) 
-z_gnb = gnb_model.predict(x_mesh).reshape(xx.shape)
-
-# Plotting 
-plt.figure(figsize=(10, 7))
-
-# 1 GaussianNB Decision Areas
-cmap_gnb = ListedColormap(["salmon", "lightgreen", "mediumturquoise", "mediumslateblue", "plum", "orange", "royalblue", "forestgreen"])
-plt.contourf(xx, yy, z_gnb, alpha = 0.5, cmap = cmap_gnb)
-
-
-# 2 Linear Decision Boundaries
-plt.contourf(xx, yy, z_linear, levels = np.arange(z_linear.max() + 2) - 0.5)
-
-
-# Data points
-cmap_data = ListedColormap(["red", "green", "blue", "purple", "pink", "brown", "cyan", "lime"])
-scatterplot = plt.scatter(x_pca_val[:, 0], x_pca_val[:, 1], c = y_pca_val, cmap = cmap_data, edgecolors = 'k', s = 50, alpha = 0.8)
-
-plt.xlabel(f"PCA Component 1: {pca.explained_variance_ratio_[0]*100:.2f}%")
-plt.ylabel(f"PCA Component 2: {pca.explained_variance_ratio_[1]*100:.2f}%")
-plt.title("Overlay: Q4. Logistic Regression Decision Boundaries - Q3. GaussianNB Decision Areas")
-plt.grid(True, linestyle = '--', alpha = 0.7)
-
-custom_lines =[
-    Line2D([0], [0], color = "black", linewidth = 2),
-    Line2D([0], [0], color = "gray", linewidth = 4),
+CONTINUOUS_FEATURES = [
+    "hour_float", 
+    "latitude", 
+    "longitude", 
+    "victim_age",
+    "temp_c", 
+    "humidity", 
+    "dist_precinct_km", 
+    "pop_density"
 ]
-plt.legend(custom_lines, ['Q4. Linear Decision Boundaries', 'Q3. GaussianNB Decision Areas'])
 
-plt.show()
+df_viz = pd.read_csv("data/data_encoded.csv")
+x_cont = df_viz[CONTINUOUS_FEATURES].values
+y_viz = df_viz["killer_id"].values
+train_mask_viz = (df_viz["split"] == "TRAIN").values
+val_mask_viz = (df_viz["split"] == "VAL").values
+
+x_cont_train = x_cont[train_mask_viz]
+x_cont_val = x_cont[val_mask_viz]
+y_train_viz = y_viz[train_mask_viz]
+y_val_viz = y_viz[val_mask_viz]
+
+pca = PCA(n_components=2)
+x_train_pca = pca.fit_transform(x_cont_train) 
+x_val_pca = pca.transform(x_cont_val)        
+
+gnb_2d = GaussianNB()
+gnb_2d.fit(x_train_pca, y_train_viz)
+
+
+linear_2d = OneVsRestClassifier(
+    SGDClassifier(
+        loss="log_loss",      
+        alpha=best_alpha,     
+        penalty="l2", 
+        max_iter=2000, 
+        random_state=42
+    )
+)
+linear_2d.fit(x_train_pca, y_train_viz)
+
+h = 0.02
+x_min, x_max = x_train_pca[:, 0].min() - 1, x_train_pca[:, 0].max() + 1
+y_min, y_max = x_train_pca[:, 1].min() - 1, x_train_pca[:, 1].max() + 1
+xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+mesh_points = np.c_[xx.ravel(), yy.ravel()]
+
+Z_bayes = gnb_2d.predict(mesh_points).reshape(xx.shape)
+Z_linear = linear_2d.predict(mesh_points).reshape(xx.shape)
+
+plt.figure(figsize=(12, 10))
+plt.contourf(xx, yy, Z_bayes, alpha=0.3, cmap='tab10')
+plt.contour(xx, yy, Z_linear, colors='k', linewidths=2, linestyles='--')
+scatter = plt.scatter(x_val_pca[:, 0], x_val_pca[:, 1], c=y_val_viz, cmap='tab10', edgecolor='k', s=60, alpha=0.8)
+legend_elements = [
+    Patch(facecolor='grey', alpha=0.3, label='Bayes Regions (Non-Linear)'),
+    Line2D([0], [0], color='k', lw=2, linestyle='--', label='Linear Boundaries (Approximation)')
+]
+plt.legend(handles=legend_elements, loc='upper right')
+plt.title("Approximate Linear Boundaries on Q3 PCA Projection", fontsize=16, fontweight="bold")
+plt.xlabel("PC1 (Continuous Features)")
+plt.ylabel("PC2 (Continuous Features)")
+plt.tight_layout()
+plt.savefig(plots_path / "overlay_linear_bayes_corrected.png", dpi=300)
+
+# --------------------------------------------------------------------------------------------------
+# Generate Submission CSV (VAL + TEST predictions)
+# --------------------------------------------------------------------------------------------------
+inference_mask = data["split"].isin(["VAL", "TEST"])
+inference_data = data[inference_mask].copy()
+x_inference = inference_data.drop(columns=drop_cols).values
+
+predictions = final_model.predict(x_inference)
+probabilities = final_model.predict_proba(x_inference)
+
+results = pd.DataFrame()
+results['predicted_killer'] = predictions
+results.insert(0, 'incident_id', inference_data['incident_id'].values)
+for idx, class_label in enumerate(final_model.classes_):
+    col_name = f'p_killer_{class_label}'
+    results[col_name] = probabilities[:, idx]
+
+print(f"Submission shape: {results.shape}")
+print(results.head())
+
+predictions_path = project_dir / "data/predictions"
+predictions_path.mkdir(parents=True, exist_ok=True)
+
+results.to_csv(predictions_path / "Linear_classifier_pred.csv", index=False)

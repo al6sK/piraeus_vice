@@ -3,92 +3,81 @@ import numpy as np
 from pathlib import Path
 import os
 from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
 from matplotlib import ticker
 from matplotlib import pyplot as plt
 from sklearn.cluster import KMeans
 from sklearn.metrics import silhouette_score
 from scipy import stats
 
+# Setup Paths
 projectDir = Path(__file__).parent.parent
-dataPath = projectDir / "data" / "data_encoded.csv"
+dataPath = projectDir / "data" / "data_encoded.csv" 
 q7_plotsPath = projectDir / "plots" / "Q7"
 q8_plotsPath = projectDir / "plots" / "Q8"
 
-# --------------------------------------------------------
-# Q7. Principal Component Analysis (PCA)
-# --------------------------------------------------------
+os.makedirs(q7_plotsPath, exist_ok=True)
+os.makedirs(q8_plotsPath, exist_ok=True)
 
+# Data Loading (Encoded Data)
 data = pd.read_csv(str(dataPath))
-# print(data.head(3))
 
-# Drop columns
-columns_to_delete = [
-    "incident_id",
-    "weapon_code",
-    "scene_type",
-    "weather"
-]
-data.drop(columns_to_delete, axis=1, inplace=True)
+# Drop metadata columns to keep only Features
+drop_cols = ["incident_id", "split", "killer_id", "weapon_code", "scene_type", "weather"]
+cols_to_drop = [c for c in drop_cols if c in data.columns]
 
-# split dataset and saving the index of each split
-ix_train = np.array(data.index[data['split'] == "TRAIN"])
-ix_dev = np.array(data.index[data['split'] == "VAL"])
-ix_test = np.array(data.index[data['split'] == "TEST"])
-data.drop('split', axis=1, inplace=True)
-
-y_encoded = pd.get_dummies(data["killer_id"])  
-
-#set X and y
-X = data.drop(columns=["killer_id"]).copy()
+# X contains features, y contains labels
+X = data.drop(columns=cols_to_drop)
 y = data["killer_id"]
 
-# --------------------------------------------------------
-# a)
-# --------------------------------------------------------
+# Split indices
+ix_train = data.index[data['split'] == "TRAIN"].tolist()
+ix_dev = data.index[data['split'] == "VAL"].tolist()
+ix_test = data.index[data['split'] == "TEST"].tolist()
 
+# Extract numpy arrays
+X_train = X.loc[ix_train].values
+X_val = X.loc[ix_dev].values
+X_test = X.loc[ix_test].values
+
+# --------------------------------------------------------
+# Q7a: Standardise continuous features 
+# --------------------------------------------------------
+scaler = StandardScaler()
+
+# Fit on TRAIN, transform TRAIN
+X_train = scaler.fit_transform(X_train)
+
+# Transform VAL and TEST using the TRAIN scaler
+X_val = scaler.transform(X_val)
+X_test = scaler.transform(X_test)
+
+# --------------------------------------------------------
+# a) Run PCA on TRAIN
+# --------------------------------------------------------
 pca = PCA()
-X_train = X.iloc[ix_train].to_numpy()
-X_pca = pca.fit_transform(X_train)
+X_pca = pca.fit_transform(X_train) 
 
 eigenvalues = pca.explained_variance_ 
-# print("Eigenvalues:", eigenvalues)
 
 # --------------------------------------------------------
-# b)
+# b) Plot Variance
 # --------------------------------------------------------
-
 cumulative_explained_variance = pca.explained_variance_ratio_.cumsum()
 
-# Define the x-tick positions (every 5th point)
+# Find index where variance >= 0.95
 tmp = np.where(cumulative_explained_variance >= 0.95)[0][0]
-x_ticks = sorted(
-    list(range(len(cumulative_explained_variance)))
-    + [
-        len(cumulative_explained_variance) - 1,
-        tmp,
-    ]
-)
+m = tmp + 1 # Number of components is index + 1
 
-plt.figure(figsize=(8, 6))
-
-# Get the corresponding explained variance values for those x-tick positions
+# Plotting
+x_ticks = sorted(list(range(len(cumulative_explained_variance))) + [len(cumulative_explained_variance)-1, tmp])
 y_values = cumulative_explained_variance[x_ticks]
 
-# Plot the cumulative explained variance only at the x-tick positions
+plt.figure(figsize=(8, 6))
 plt.plot(x_ticks, y_values, marker="o", linestyle="--", color="b", linewidth=1.3)
-
-# Highlight the threshold for 95% explained variance
 plt.axhline(cumulative_explained_variance[tmp], color="r", linestyle="--", linewidth=2)
 plt.axvline(tmp, color="r", linestyle="--", linewidth=2)
-
-# Title and labels with added subtitle for clarity
-plt.title(
-    "Explained Variance by Principal Components",
-    fontsize=18,
-    loc="left",
-    fontweight="bold",
-    pad=30,
-)
+plt.title("Explained Variance by Principal Components", fontsize=18, fontweight="bold", pad=30)
 plt.figtext(
     0.08,
     0.9,
@@ -98,135 +87,109 @@ plt.figtext(
 )
 plt.xlabel("Principal Component")
 plt.ylabel("Explained Variance Ratio")
-
-# Adjust x-ticks to plot every 5th point
-plt.xticks(x_ticks)
-
-# Customize gridlines for better readability
 plt.grid(True, linestyle="--", alpha=0.5)
-plt.gca().yaxis.set_major_formatter(ticker.PercentFormatter(xmax=1))
-# Tidy layout and show the plot
 plt.tight_layout()
-os.makedirs(os.path.join(q7_plotsPath), exist_ok=True)
-plt.savefig(str(q7_plotsPath / "Explained Variance by Principal Components.png"), dpi=300, bbox_inches="tight")
+plt.savefig(str(q7_plotsPath / "explained_variance.png"), dpi=300)
+plt.close()
+
+print(f"Number of components for 95% variance: {m}")
 
 # --------------------------------------------------------
-# c)
+# c) Project VAL onto PC1, PC2
 # --------------------------------------------------------
-
-X_val = X.iloc[ix_dev].to_numpy()
+# Project VAL data
 X_val_embed = pca.transform(X_val)
-# Scatter plot of the first two PCA components
+
 plt.figure(figsize=(8, 6))
-plt.scatter(X_val_embed[:, 0], X_val_embed[:, 1], c=data["killer_id"].iloc[ix_dev], cmap="tab10", alpha=0.7)
+plt.scatter(X_val_embed[:, 0], X_val_embed[:, 1], c=y.iloc[ix_dev], cmap="tab10", alpha=0.7)
 plt.title("PCA on VAL: First Two Components", fontsize=16, fontweight="bold")
 plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
-# plt.colorbar()
 plt.tight_layout()
-plt.savefig(str(q7_plotsPath / "Projection of each VAL feature vector xi onto the first two principal components.png"), dpi=300, bbox_inches="tight")
+plt.savefig(str(q7_plotsPath / "val_pca_projection.png"), dpi=300)
+plt.close()
 
 # --------------------------------------------------------
-# Q8. k-means clustering in latent space
+# Q8 k-means clustering in latent space
 # --------------------------------------------------------
 
-# --------------------------------------------------------
-# a: project each feature vector xi onto the first m principal components
-# --------------------------------------------------------
-
+# a) Project all splits onto first m components
 X_train_embed = pca.transform(X_train)
-# X_val_embed is ready from last step
-X_test = X.iloc[ix_test].to_numpy()
 X_test_embed = pca.transform(X_test)
 
-m = tmp
-Z_train = X_train_embed[:,:m-1]
-Z_val = X_val_embed[:,:m-1]
-Z_test = X_test_embed[:,:m-1]
+# Keep only first m components
+Z_train = X_train_embed[:, :m]
+Z_val = X_val_embed[:, :m]
+Z_test = X_test_embed[:, :m]
 
-# --------------------------------------------------------
-# b: Run k-means with k = S
-# --------------------------------------------------------
-
-k = data["killer_id"].nunique() # = S = 8
-kmeans = KMeans(n_clusters=k, random_state=42)
+# b) Run k-means with k=S on TRAIN
+k_clusters = y.nunique() # S=8
+kmeans = KMeans(n_clusters=k_clusters, random_state=42)
 clusters = kmeans.fit_predict(Z_train)
 
-# print(clusters)
 silhouette = silhouette_score(Z_train, clusters)
-print("KMeans Silhouette Score:", silhouette)
+print("KMeans Silhouette Score (TRAIN):", silhouette)
 
-# --------------------------------------------------------
-# c: mapping from k-means clusters to killer labels using majority vote
-# --------------------------------------------------------
-
-result = stats.mode(clusters, keepdims=True)
-
+# c) Mapping from clusters to labels
 mapping = {}
-
-for q in range(k):
-    # create a filter for current cluster q
+print("\nCluster to Killer Mapping:")
+for q in range(k_clusters):
     mask = (clusters == q)
-    labels_in_cluster = y.iloc[ix_train].values[mask]
-    
-    mode_result = stats.mode(labels_in_cluster, keepdims=True)
-    winner = mode_result.mode[0]
-    votes = mode_result.count[0]
-    # save winning match
-    mapping[q] = int(winner)
-    print(f"Cluster {q}: Winner= {winner}, Votes= {votes}/{len(labels_in_cluster)}")
-    
+    if np.sum(mask) > 0:
+        labels_in_cluster = y.iloc[ix_train].values[mask]
+        mode_res = stats.mode(labels_in_cluster, keepdims=True)
+        winner = mode_res.mode[0]
+        votes = mode_res.count[0]
+        mapping[q] = int(winner)
+        print(f"Cluster {q} -> Killer {winner} ({votes}/{len(labels_in_cluster)} votes)")
+    else:
+        mapping[q] = 1 # Default fallback
+        print(f"Cluster {q} -> Empty (Default 1)")
 
-print("The map:")
-print(mapping)
-
-# --------------------------------------------------------
-# d: Evaluating k-means on VAL
-# --------------------------------------------------------
-
+# d) Evaluate on VAL
 val_clusters = kmeans.predict(Z_val)
+val_preds = [mapping[c] for c in val_clusters]
+val_acc = np.mean(val_preds == y.iloc[ix_dev].values)
+print(f"\nVAL Accuracy (K-Means): {val_acc:.4f}")
 
-# print(val_clusters)
-# print(data["killer_id"].iloc[ix_dev])
-
-correct_classifications = 0.0
-j=0
-for i in val_clusters:
-    if(mapping[i] == data["killer_id"].iloc[ix_dev[j]]):
-        correct_classifications += 1
-    j += 1
-accuracy = correct_classifications/len(val_clusters)
-print(f"VAL accuracy= {accuracy:.3f}")
-
-# --------------------------------------------------------
-# e: Evaluating k-means on TRAIN
-# --------------------------------------------------------
-
+# e) Evaluate on TEST
 test_clusters = kmeans.predict(Z_test)
+test_preds = [mapping[c] for c in test_clusters]
+test_acc = np.mean(test_preds == y.iloc[ix_test].values)
+print(f"TEST Accuracy (K-Means): {test_acc:.4f}")
 
-# print(val_clusters)
-# print(data["killer_id"].iloc[ix_dev])
-
-correct_classifications = 0.0
-j=0
-for i in test_clusters:
-    if(mapping[i] == data["killer_id"].iloc[ix_test[j]]):
-        correct_classifications += 1
-    j += 1
-accuracy = correct_classifications/len(test_clusters)
-print(f"TEST accuracy= {accuracy:.3f}")
-
-# --------------------------------------------------------
-# f: project the TEST incidents onto PC1 and PC2 and create a scatter plot
-# --------------------------------------------------------
-
-# Scatter plot of the first two PCA components
+# f) Scatter plot for TEST (PC1 vs PC2) coloured by PREDICTED label
 plt.figure(figsize=(8, 6))
-plt.scatter(X_test_embed[:, 0], X_test_embed[:, 1], c=data["killer_id"].iloc[ix_test], cmap="tab10", alpha=0.7)
-plt.title("PCA on TEST: First Two Components", fontsize=16, fontweight="bold")
+plt.scatter(X_test_embed[:, 0], X_test_embed[:, 1], c=test_preds, cmap="tab10", alpha=0.7)
+plt.title("PCA on TEST: Coloured by K-Means Predictions", fontsize=16, fontweight="bold")
 plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
-# plt.colorbar()
 plt.tight_layout()
-os.makedirs(os.path.join(q8_plotsPath), exist_ok=True)
-plt.savefig(str(q8_plotsPath / "Projection of each TEST feature vector xi onto the first two principal components.png"), dpi=300, bbox_inches="tight")
+plt.savefig(str(q8_plotsPath / "test_pca_kmeans_predictions.png"), dpi=300)
+plt.close()
+
+# --------------------------------------------------------
+# Save Results (Submission format for VAL + TEST)
+# --------------------------------------------------------
+inference_indices = ix_dev + ix_test
+inference_preds = val_preds + test_preds
+
+inference_ids = data.loc[inference_indices, "incident_id"].values
+
+results = pd.DataFrame()
+results['incident_id'] = inference_ids
+results['predicted_killer'] = inference_preds
+
+for k in range(1, 9):
+    results[f'p_killer_{k}'] = 0.0
+
+pred_array = np.array(inference_preds)
+for k in range(1, 9):
+    results.loc[results['predicted_killer'] == k, f'p_killer_{k}'] = 1.0
+
+results = results.sort_values("incident_id")
+predictions_path = projectDir / "data/predictions"
+predictions_path.mkdir(parents=True, exist_ok=True)
+
+results.to_csv(predictions_path / "Kmeans_pred.csv", index=False)
+print(results.head())

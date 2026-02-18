@@ -1,6 +1,0 @@
-Q2:
-- do Q2
-Q4:
-- c) do all from the start using stuff from Q3
-Q5:
-- 
