@@ -91,11 +91,13 @@ print(classification_report(y_true, y_pred, digits=4))
 # Plot Confusion Matrix
 # ---------------------------------------------------------
 cm = confusion_matrix(y_true, y_pred)
-labels = sorted(list(set(y_true))) # Ετικέτες 1-8
-fig, ax = plt.subplots(figsize=(8, 8))
+labels = sorted(list(set(y_true))) 
+_, ax = plt.subplots(figsize=(10, 8))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
-disp.plot(values_format='d')
-plt.title(f"Submission Confusion Matrix\nAcc: {acc:.4f} - F1: {f1_weighted:.4f}")
+# disp.plot(values_format='d')
+disp.plot(ax=ax)
+plt.title(f"Submission Confusion Matrix\nAcc: {acc:.4f} - F1: {f1_weighted:.4f}", fontsize=16, fontweight="bold")
 plt.tight_layout()
 cm_path = plots_path / "Ensemble_Confusion_Matrix.png"
-plt.savefig(cm_path, dpi=300)
+plt.savefig(cm_path, dpi=300, bbox_inches="tight")
+plt.close()
