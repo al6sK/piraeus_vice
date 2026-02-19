@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+
 from pathlib import Path
 import numpy as np
 import seaborn as sns
@@ -128,7 +133,7 @@ _, ax = plt.subplots(figsize=(10, 8))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
 disp.plot(ax=ax)
 
-ax.set_title("Confusion matrix of Bayesian classification on VAL")
+ax.set_title(f"Confusion matrix of Bayesian classification on VAL\nAccuracy: {val_accuracy.sum()/len(val_data):.2%}", fontsize=16, fontweight="bold")
 ax.set_xlabel("Predicted categories")
 ax.set_ylabel("Actual categories")
 

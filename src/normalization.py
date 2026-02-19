@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+
 import pandas as pd
 from pathlib import Path
 from sklearn.preprocessing import MinMaxScaler,OneHotEncoder

@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+ 
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -16,7 +21,7 @@ plots_path.mkdir(parents=True, exist_ok=True)
 
 files_to_ensemble = [
     # "bayesian_pred.csv",
-    # "Linear_classifier_pred.csv",
+    "Linear_classifier_pred.csv",
     "MLP_pred.csv",
     "SVM_pred.csv",
 ]

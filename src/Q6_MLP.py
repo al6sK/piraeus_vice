@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+ 
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -44,22 +49,22 @@ y = data["killer_id"]
 # --------------------------------------------------
 reduce_lr = ReduceLROnPlateau(
     monitor='val_loss', 
-    factor=0.55,   # 0.55 
-    patience=40,       
+    factor=0.7,   # 0.55 
+    patience=40,   #40    
     min_lr=0.00001,  
     verbose=1
 )
 # best : 
-# 12->12->8     :   Weighted F1 score: 0.948 Accuracy: 0.948
+# 64->16->16->8     
 
 class FC_MNIST(models.Model):
     def __init__(self):
         super(FC_MNIST, self).__init__()
         # Creating layers in the initializer
         self.fc1 = layers.Dense(units=64, activation="relu")#64
-        self.dropout = layers.Dropout(0.2)   
-        self.fc2 = layers.Dense(units=16, activation="relu")#16
-        self.fc3 = layers.Dense(units=16, activation="relu")            
+        self.dropout = layers.Dropout(0.3)   
+        self.fc2 = layers.Dense(units=32, activation="relu")#16
+        self.fc3 = layers.Dense(units=8, activation="relu")            
         self.fc4 = layers.Dense(units = 8, activation="softmax")  # Output layer
     def call(self, input_tensor, training=False):
         # Pass input_tensor through the layers sequentially
@@ -148,7 +153,7 @@ fig, ax = plt.subplots(figsize=(10, 8))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
 disp.plot(ax=ax, xticks_rotation=90)
 
-ax.set_title("Confusion matrix for Neural Network")
+ax.set_title(f"Confusion matrix for Neural Network\nWeighted F1 score: {base_score:.3f}", fontsize=16, fontweight="bold")
 ax.set_xlabel("Predicted categories")
 ax.set_ylabel("Actual categories")
 

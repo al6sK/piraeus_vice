@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+ 
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -97,12 +102,15 @@ print(classification_report(y_val, y_val_pred))
 
 # Confusion Matrix
 cm = confusion_matrix(y_val, y_val_pred)
-disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=final_model.classes_)
-fig, ax = plt.subplots(figsize=(10, 8))
-disp.plot(ax=ax, cmap='Blues')
-plt.title(f"SVM Confusion Matrix\nAccuracy: {accuracy_val:.2%}")
-plt.savefig(plots_path / "confusion_matrix_svm.png")
-
+labels = final_model.classes_
+_, ax = plt.subplots(figsize=(10, 8))
+disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
+disp.plot(ax=ax)
+plt.title(f"SVM Confusion Matrix\nAccuracy: {accuracy_val:.2%}", fontsize=16, fontweight="bold")
+ax.set_xlabel("Predicted categories")
+ax.set_ylabel("Actual categories")
+plt.savefig(plots_path / "confusion_matrix_svm.png", dpi=300, bbox_inches="tight")
+plt.close()
 # ----------------------------------------------------------
 # Visualization: Decision Regions & Support Vectors (PCA)
 # ----------------------------------------------------------
@@ -131,7 +139,7 @@ plt.scatter(x_train_pca[:, 0], x_train_pca[:, 1], c=y_train, cmap='tab10', edgec
 # Highlight Support Vectors
 sv = svm_viz.support_vectors_
 plt.scatter(sv[:, 0], sv[:, 1], s=120, linewidth=1.5, facecolors='none', edgecolors='k', label='Support Vectors')
-plt.title(f"SVM Decision Regions (PCA Space)\nKernel: {best_params['kernel']}")
+plt.title(f"SVM Decision Regions (PCA Space)\nKernel: {best_params['kernel']}", fontsize=16, fontweight="bold")
 plt.xlabel("PC1")
 plt.ylabel("PC2")
 plt.legend(loc='upper right')

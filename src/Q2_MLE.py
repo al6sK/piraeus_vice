@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+
 from pathlib import Path
 import numpy as np
 import seaborn as sns
@@ -102,8 +107,8 @@ for i in range(8):
         annot=True,
         fmt=".2f",
         linewidths=0.5,
-        vmin=-1,
-        vmax=1,  # Ensure that color scaling is consistent
+        vmin=-(max(abs(corr.min()), abs(corr.max()))),
+        vmax=max(abs(corr.min()), abs(corr.max())),  # Ensure that color scaling is consistent
         cbar_kws={"label": "Correlation Coefficient"},
         annot_kws={"size": 10},  # Adjust annotation size
         xticklabels=CONTINUOUS_FEATURES, 

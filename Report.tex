@@ -1,0 +1,493 @@
+\documentclass{article}
+
+% Language setting
+% Replace `english' with e.g. `spanish' to change the document language
+\usepackage[english]{babel}
+
+% Set page size and margins
+% Replace `letterpaper' with `a4paper' for UK/EU standard size
+\usepackage[letterpaper,top=2cm,bottom=2cm,left=3cm,right=3cm,marginparwidth=1.75cm]{geometry}
+
+% Useful packages
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{authblk}
+\usepackage{fontawesome5}
+\usepackage[colorlinks=true, allcolors=blue]{hyperref}
+
+\title{\textbf{Piraeus Vice Homicide Division Report}}
+
+% Who Is The Killer?
+\author{Alexios Kastanaras P22062}
+\author{Danai Harzaka P22194}
+\author{Dimitrios Lazanas P22082}
+\affil{Contact email for the group: alexioskast@gmail.com}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This report details a pattern recognition investigation conducted on the Piraeus Vice Homicide Division dataset, which includes 4,000--5,000 anonymised crime incidents recorded between 2019 and 2024. The study aims to distinguish the unique behavioral signatures of $S=8$ distinct serial killers by utilizing a structured sequence of analytical methods. Our methodology progresses from initial exploratory data analysis and Maximum Likelihood Estimation (MLE) to advanced discriminative classifiers, including Support Vector Machines (SVM) and Multi-Layer Perceptrons (MLP). The investigation culminated in the development of a Soft Voting Ensemble that aggregates the predictive strengths of our most effective models. This system achieved a final evaluation accuracy of \textbf{95.19\%} and a weighted F1-score of \textbf{0.9497}, demonstrating high robustness in identifying perpetrators within a complex feature space of spatial-temporal and categorical attributes.
+\end{abstract}
+
+% ---------------------------------------------------------------------------
+\section*{Data Preprocessing: Normalization and Encoding}
+% ---------------------------------------------------------------------------
+Before training the discriminative models and performing Principal Component Analysis (PCA), we applied rigorous preprocessing to the raw dataset to ensure numerical stability and appropriate feature representation. As mathematically defined in the problem description, the processing was divided into two main parts: handling the continuous attributes and encoding the categorical ones.
+
+\begin{itemize}
+\item \textbf{Normalization of Continuous Features:}
+The continuous part of the feature vector, $x_{i}^{(c)} \in \mathbb{R}^{d_c}$, consists of 8 features: \texttt{hour\_float}, \texttt{latitude}, \texttt{longitude}, \texttt{victim\_age}, \texttt{temp\_c}, \texttt{humidity}, \texttt{dist\_precinct\_km}, and \texttt{pop\_density}. Since our machine learning algorithms (particularly SVM and MLP) are sensitive to the magnitude and scale of input features, we standardized these variables using Min-Max scaling. For each continuous feature $j$, the scaled value is computed as:
+\begin{equation}
+    \tilde{x}_{i,j}^{(c)} = \frac{x_{i,j}^{(c)} - \min(x_{j}^{(c)})}{\max(x_{j}^{(c)}) - \min(x_{j}^{(c)})}
+\end{equation}
+This transformation linearly maps all continuous values into a uniform $[0, 1]$ range. In our implementation using \texttt{scikit-learn}'s \texttt{MinMaxScaler}, we additionally rounded the resulting scaled features to 3 decimal digits. This specific engineering step was introduced to prevent excessive floating-point precision from adding unnecessary computational noise to our models.
+
+\item \textbf{One-Hot Encoding of Categorical Features:}
+The raw dataset contains categorical variables represented as arbitrary integer codes. Based on our processing script, we isolated three key categorical features for transformation: \texttt{weapon\_code} ($w_i$), \texttt{scene\_type} ($s_i$), and \texttt{weather} ($r_i$). To prevent the models from incorrectly interpreting these nominal codes as continuous or ordinal values, we applied one-hot encoding. 
+
+For each incident $i$, the categorical block $x_{i}^{(cat)}$ is formed by concatenating the one-hot vectors of these specific features:
+\begin{equation}
+    x_{i}^{(cat)} = \left[ e^{(weapon)}(w_i)^\top, e^{(scene)}(s_i)^\top, e^{(weather)}(r_i)^\top \right]^\top
+\end{equation}
+where, for example, $e^{(weapon)}(w_i)$ is a binary vector with a value of $1$ at the index corresponding to the weapon category used, and $0$ in all other positions. We implemented this using the \texttt{OneHotEncoder} (configured to ignore unknown categories), resulting in a sparse, orthogonal representation of the crime scene context.
+
+\item \textbf{Final Feature Vector:}
+After applying these transformations independently, the final preprocessed dataset was constructed by concatenating the normalized continuous features and the encoded categorical features into a single, unified feature vector $x_i = [x_i^{(c)}; x_i^{(cat)}]$. This fully transformed dataset was exported as \texttt{data\_encoded.csv} and served as the foundational input for all subsequent model training and evaluation steps.
+\end{itemize}
+% ---------------------------------------------------------------------------
+\section*{Q1. Exploratory Distributions}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{1D Feature Distributions:}
+In this first step, we explored the continuous features by visualising their one-dimensional distributions using histograms overlaid with Kernel Density Estimates (KDE). The data used includes both the TRAIN and VAL splits. The visualised features are \texttt{hour\_float}, \texttt{victim\_age}, \texttt{latitude}, and \texttt{longitude}. 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/distributions_histplots/hour_float.png}
+    \caption{Distribution of the time of the incident (\texttt{hour\_float}).}
+    \label{fig:q1_hist_hour}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/distributions_histplots/victim\_age.png}
+    \caption{Distribution of the age of the victim (\texttt{victim\_age}).}
+    \label{fig:q1_hist_age}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/distributions_histplots/latitude.png}
+    \caption{Distribution of the latitude position of the incident (\texttt{latitude}).}
+    \label{fig:q1_hist_latitude}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/distributions_histplots/longitude.png}
+    \caption{Distribution of the longitude position of the incident (\texttt{longitude}).}
+    \label{fig:q1_hist_longitude}
+\end{figure}
+
+\end{itemize}
+
+\begin{itemize}
+\item \textbf{Gaussian and GMM Fitting on \texttt{hour\_float}:} To better understand the temporal distribution of crimes, we modelled the \texttt{hour\_float} variable using parametric distributions. At first, we fitted a single Gaussian distribution $ \mathcal{N}(\mu, \sigma^2) $ using the sample mean and variance and next, we fitted a 3-component 1D Gaussian Mixture Model (GMM), mathematically defined as:
+\begin{equation}
+    p(h) = \sum_{j=1}^{3}\alpha_{j}\mathcal{N}(h|m_{j},s_{j}^{2}), \quad \alpha_{j}\ge 0, \quad \sum_{j=1}^{3}\alpha_{j}=1
+\end{equation}
+where $\alpha_j$ represents the weight of the $j$-th component. 
+
+We plot the results in (Figure \ref{fig:q1_gmm}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/hour_float_gaussian_vs_gmm.png}
+    \caption{Histogram of \texttt{hour\_float} overlaid with a single Gaussian density (red) and a 3-component Gaussian mixture density (purple).}
+    \label{fig:q1_gmm}
+\end{figure}
+
+
+\end{itemize}
+
+\begin{itemize}
+\item \textbf{2D Spatial and Temporal Patterns:} To identify potential spatial-temporal structures, we created two-dimensional density plots involving \texttt{hour\_float} against spatial features (\texttt{latitude} and \texttt{longitude}), using the TRAIN and VAL splits without any labels and plot them in (Figure \ref{fig:q1_2d_lat}) and (Figure \ref{fig:q1_2d_long}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/hour_float vs latitude.png}
+    \caption{2D density plot of \texttt{hour\_float} vs. \texttt{latitude}.}
+    \label{fig:q1_2d_lat}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight]{plots/Q1/hour_float vs longitude.png}
+    \caption{2D density plot of \texttt{hour\_float} vs. \texttt{longitude}.}
+    \label{fig:q1_2d_long}
+\end{figure}
+
+Observing the 2D plot (Figure \ref{fig:q1_2d_lat}), we can detect several non-trivial patterns. Specifically, the ones that stand out the most can be categorized into 3 areas. The first is approximately between latitude (37.9, 38.1) and hours (4:00, 12:00), the second is approximately at latitude (38.1, 38.2) and hours (10:00, 20:00) and the last is approximately at latitude (37.7, 38.0) and hours (10:00, 23:59)
+
+\end{itemize}
+
+The single Gaussian distribution is inadequate as it fails to capture the clear multimodality of the dataset, oversimplifying the distinct temporal peaks where incidents cluster. The 3-component mixture model provides a much better fit, revealing specific "time-of-day" modes:
+\begin{itemize}
+\item Peak 1 ($\sim$12:00): A dominant midday mode.
+\item Peak 2 ($\sim$19:00): A late-day/evening mode.
+\item Peak 3 ($\sim$06:00): A significant morning activity mode.
+\end{itemize}
+These components suggest that criminal activity follows a specific daily rhythm with three main temporal "hotspots" rather than a simple, symmetrical bell-curve pattern.
+
+% ---------------------------------------------------------------------------
+\section*{Q2. Maximum Likelihood Gaussians per killer (MLE)}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Maximum Likelihood Estimators Derivation:} 
+Restricting our dataset to the TRAIN split where the \texttt{killer\_id} is known, we assume that for a given killer $k$, the continuous features follow a multivariate Gaussian distribution:
+\begin{equation}
+    x_{i}^{(c)}|(K_{i}=k) \sim \mathcal{N}(\mu_{k},\Sigma_{k})
+\end{equation}
+Let $\mathcal{I}_k$ be the set of incidents committed by killer $k$, and $N_k$ be the total number of such incidents. To find the parameters that best describe each killer's behavior, we maximize the log-likelihood function. Taking the partial derivatives of the log-likelihood with respect to $\mu_k$ and $\Sigma_k$ and setting them to zero, we derive the standard Maximum Likelihood Estimators (MLE) for the mean vector and covariance matrix:
+\begin{equation}
+    \hat{\mu}_{k} = \frac{1}{N_{k}}\sum_{i\in \mathcal{I}_{k}}x_{i}^{(c)}
+\end{equation}
+\begin{equation}
+    \hat{\Sigma}_{k} = \frac{1}{N_{k}}\sum_{i\in\mathcal{I}_{k}}(x_{i}^{(c)}-\hat{\mu}_{k})(x_{i}^{(c)}-\hat{\mu}_{k})^{\top}
+\end{equation}
+
+\item \textbf{Numerical Verification:}
+We implemented these estimators from scratch using \texttt{numpy}. To ensure correctness, we calculated the total log-likelihood of the TRAIN samples for each killer using our custom estimators and compared it against the results produced by a trusted library (\texttt{scipy.stats.multivariate\_normal}). The values matched perfectly up to numerical tolerance for all 8 killers.
+
+\item \textbf{Empirical Covariance and Correlation Matrices:}
+Using the estimated $\hat{\Sigma}_{k}$ matrices, we generated heatmaps for each killer $k$. Each $(p,q)$ entry of the matrix $\hat{\Sigma}_{k}$ represents the empirical covariance between features $X_p$ and $X_q$ for incidents attributed to that specific killer:
+\begin{equation}
+    \hat{\Sigma}_{k}(p,q) = \widehat{\text{Cov}}(X_p, X_q \mid K=k)
+\end{equation}
+These matrices, along with the corresponding correlation matrices $\hat{R}_{k}$, 
+\begin{equation}
+    \hat{R}_{k}(p,q) = \frac{\hat{\Sigma}_{k}(p,q)}{\sqrt{\hat{\Sigma}_{k}(p,p)}\sqrt{\hat{\Sigma}_{k}(q,q)}}
+\end{equation}
+allow us to identify which pairs of features (e.g., location vs. time) are most strongly related for each perpetrator. We plot both, the Empirical Covariance matrix $\hat{\Sigma}_{k}(p,q)$ in (Figure \ref{fig:q2_emp_corr_1}) and the Correlation Matrix in (Figure \ref{fig:q2_corr_1}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q2/empirical_covariance/emp_corr_of_killer_1.png}
+    \caption{covariance matrix heatmap of the continuous features for Killer 1.}
+    \label{fig:q2_emp_corr_1}
+\end{figure}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q2/correlation_matrix/corr_matrix_of_killer_1.png}
+    \caption{Correlation matrix heatmap of the continuous features for Killer 1.}
+    \label{fig:q2_corr_1}
+\end{figure}
+
+\item \textbf{Mahalanobis Distance Ellipses:}
+To visualize the spatial and temporal "territory" of each killer, we projected the data into selected 2D planes: (\texttt{latitude}, \texttt{longitude}) and (\texttt{hour\_float}, \texttt{latitude}). For each killer $k$, we computed the sample mean $\hat{\mu}_{k}^{(2)}$ and covariance $\hat{\Sigma}_{k}^{(2)}$ in the 2D plane. We then found the maximum Mahalanobis distance $c_k = \max_i D_i^2$ among the killer's TRAIN incidents. Finally, we plotted the bounding ellipses defined by:
+\begin{equation}
+    (x-\hat{\mu}_{k}^{(2)})^{\top}(\hat{\Sigma}_{k}^{(2)})^{-1}(x-\hat{\mu}_{k}^{(2)})=c_{k}
+\end{equation}
+which tightly enclose all TRAIN points of each killer in these projections.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q2/ellipses/ellipse_hour_float_vs_latitude.png}
+    \caption{Mahalanobis ellipses enclosing the incidents of each killer in the \texttt{hour\_float} vs \texttt{latitude} projection.}
+    \label{fig:q2_ellipse_hour_lat}
+\end{figure}
+
+\end{itemize}
+
+Observing the Mahalanobis ellipses, we can see that the spatial and temporal signatures of the 8 killers have distinct characteristics. In the spatial projection (\texttt{longitude} vs \texttt{latitude}), some killers operate in tightly confined, overlapping regions, while others show a much wider and distinct geographical spread. When factoring in the time of the incident (\texttt{hour\_float} vs \texttt{latitude}) in (Figure \ref{fig:q2_ellipse_hour_lat}), the separation between certain killers becomes slightly clearer, confirming that combining "where" and "when" is highly valuable for distinguishing the perpetrators.
+
+% ---------------------------------------------------------------------------
+\section*{Q3. Multiclass Gaussian Bayes classifier (Bayesian classification)}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Posterior Probabilities and Hard Decision:}
+Building upon the Maximum Likelihood Estimators from the previous step, we implemented a generative multiclass Gaussian Bayes classifier. For the continuous features, we modeled the likelihood of an incident belonging to killer $k$ as a multivariate Gaussian:
+\begin{equation}
+    p(x^{(c)}|K=k) = \mathcal{N}(x^{(c)}|\hat{\mu}_k, \hat{\Sigma}_k)
+\end{equation} 
+The prior probability for each killer was estimated directly from the TRAIN split as the class frequency: 
+\begin{equation}
+    \pi_k = \frac{N_k}{\sum_{j=1}^{S} N_j}, ~~k = 1, . . . , S.
+\end{equation}    
+Using Bayes' theorem, we calculated the unnormalised posterior probabilities:
+\begin{equation}
+    p(K=k|x_i^{(c)}) \propto \pi_k \mathcal{N}(x_i^{(c)}|\hat{\mu}_k, \hat{\Sigma}_k)
+\end{equation}
+To make a hard decision for each incident, we assigned the killer with the highest posterior probability: 
+\begin{equation}
+    \hat{c}_i = \arg\max_k \hat{\pi}_i(k)
+\end{equation}
+
+\item \textbf{Evaluation on TRAIN and VAL:}
+To evaluate the classifier's performance and generalization, we calculated the accuracy on both the TRAIN and VAL datasets. The model achieved an accuracy of 90.14\% on the TRAIN set (sanity check) and 90.61\% on the VAL set. To further analyze the classification performance, we computed the confusion matrix on the VAL split, presented in (Figure \ref{fig:q3_confusion_matrix}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q3/Confusion_matrix_of_VAL.png}
+    \caption{Confusion matrix of the Bayesian classification on the VAL split.}
+    \label{fig:q3_confusion_matrix}
+\end{figure}
+
+\item \textbf{PCA Projection and Decision Regions:}
+To visualize the decision boundaries induced by our Bayes classifier, we applied Principal Component Analysis (PCA) on the continuous features of the TRAIN split, reducing the dimensionality to 2 components (PC1 and PC2). We created a dense mesh grid in this 2D space, mapped it back to the original 8D space using the inverse PCA transformation, and evaluated our classifier to find the predicted regions.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q3/two_dimensional_projection.png}
+    \caption{Bayesian Decision Regions in a two-dimensional PCA projection, overlaid with TRAIN instances coloured by the true killer.}
+    \label{fig:q3_pca_regions}
+\end{figure}
+
+\end{itemize}
+
+Observing the confusion matrix (Figure \ref{fig:q3_confusion_matrix}), the classifier successfully identifies incidents for certain killers (e.g., Killers 3, 6, and 7 display strong true-positive diagonals), but struggles with others, leading to misclassifications. Looking at the PCA projection (Figure \ref{fig:q3_pca_regions}), we can see that the decision boundaries are highly non-linear. This is characteristic of a Gaussian Bayes classifier (Quadratic Discriminant Analysis) where each class has its own distinct covariance matrix. While the regions capture the general spread of the killers' territories, the significant overlap of the TRAIN points in the 2D space highlights the complexity of the data and explains the overlapping confusion between specific killer profiles.
+
+% ---------------------------------------------------------------------------
+\section*{Q4. Linear classifier (linear networks)}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Model Definition and Training:} 
+Shifting from a generative to a discriminative approach, we treated the problem as a multiclass classification task using the full feature vector $x_i \in \mathbb{R}^d$, which includes both the continuous features and the one-hot encoded categorical features. We defined a linear classifier of the form:
+\begin{equation}
+    f(x) = Wx + b
+\end{equation}
+where $W \in \mathbb{R}^{S \times d}$ is the weight matrix and $b \in \mathbb{R}^S$ is the bias vector. The predicted killer for incident $i$ is determined by the maximum score:
+\begin{equation}
+    \hat{c}_i = \arg\max_{k} f_k(x_i)
+\end{equation}
+where $f_k(x_i)$ denotes the $k$-th component of the score vector. 
+
+In our implementation, we utilised Stochastic Gradient Descent (\texttt{SGDClassifier}) with a logistic loss function, wrapped within a \texttt{OneVsRestClassifier} to handle the multiclass nature of the problem. To optimise the model, we performed hyperparameter tuning on the regularisation term (L2 penalty, controlled by $\alpha$) using \texttt{GridSearchCV} over the combined TRAIN and VAL sets, employing a predefined split and evaluating the Sum of Squared Errors (SSE) against one-hot targets.
+
+\item \textbf{Evaluation and Comparison with Q3:}
+Using the optimal regularisation parameter found during cross-validation, we trained the final linear model on the TRAIN split and evaluated it on the VAL split. The linear classifier achieved an accuracy of 92.17\% on the VAL set. We also computed the confusion matrix, shown in (Figure \ref{fig:q4_confusion_matrix}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q4/Confusion_matrix_for_Linear_classifier.png}
+    \caption{Confusion matrix of the Linear classifier on the VAL split.}
+    \label{fig:q4_confusion_matrix}
+\end{figure}
+
+Comparing the two models, the linear classifier achieved a higher accuracy of 92.17\% on the VAL split compared to the 90.61\% of the Gaussian Bayes classifier (Q3). This performance gain of approximately 1.56\% suggests that the discriminative approach, which directly models the decision boundaries, is slightly more effective for this dataset than the generative approach. A key factor in this improvement is likely the inclusion of the full feature vector $x_i$ in the linear model , which incorporates the encoded categorical variables (e.g., weapon type, scene) , whereas the Bayes classifier in Q3 was restricted solely to the continuous attributes. Despite the linear model's inherent simplicity and lack of non-linear decision regions like those seen in Q3, its ability to leverage the broader feature space allows for better overall differentiation between the killer profiles.
+
+\item \textbf{Approximate Linear Boundaries on PCA Projection:}
+To visually compare the discriminative power of the linear model against the generative Bayes model, we overlaid the approximate linear decision boundaries onto the 2D PCA projection of the continuous features from Q3. 
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q4/overlay_linear_bayes_corrected.png}
+    \caption{Approximate linear decision boundaries (dashed lines) overlaid on the non-linear Bayesian decision regions (shaded areas) in the 2D PCA projection.}
+    \label{fig:q4_overlay}
+\end{figure}
+As seen in (Figure \ref{fig:q4_overlay}), the linear model creates strict hyperplane boundaries (straight lines in 2D), whereas the Gaussian Bayes classifier induces complex, non-linear (quadratic) decision regions. The linear model fails to match the Gaussian Bayes classifier in regions where the data distribution is highly curved or when a class is entirely enveloped by another in the feature space. Because the linear classifier cannot draw elliptical boundaries, it is forced to slice through overlapping clusters, potentially leading to a higher misclassification rate in the dense central area of the PCA space.
+
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Q5. Support Vector Machines (SVMs)}
+% ---------------------------------------------------------------------------
+
+\begin{itemize}
+\item \textbf{Model Implementation and Hyperparameter Tuning:}
+To capture highly non-linear decision boundaries, we modeled the problem using Support Vector Machines (SVMs) with a One-vs-Rest (OvR) multiclass strategy. Because SVMs are highly sensitive to the scale of the input features, we first standardized the training and validation data (zero mean, unit variance) using \texttt{StandardScaler}. We then implemented a grid search using \texttt{GridSearchCV} over a predefined TRAIN/VAL split to find the optimal hyperparameters, exploring both Polynomial (degree 2) and Radial Basis Function (RBF) kernels. The optimal parameters found during this tuning phase were an RBF kernel with $C=10$ and $\gamma=\text{'scale'}$.
+
+\item \textbf{Evaluation and Comparison:}
+Using these optimal parameters, we retrained the SVM on the TRAIN split and evaluated it on the VAL split. The model achieved a high accuracy of \textbf{91.86\%} on the VAL set. We also computed the confusion matrix, shown in (Figure \ref{fig:q5_confusion_matrix}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q5/confusion_matrix_svm.png}
+    \caption{Confusion matrix of the SVM classifier (RBF kernel) on the VAL split.}
+    \label{fig:q5_confusion_matrix}
+\end{figure}
+
+Comparing this to our previous models, the SVM out-performs the Gaussian Bayes classifier (Q3, 90.61\%) but falls slightly short of the Linear classifier (Q4, 92.17\%). This suggests that while the non-linear transformation of the RBF kernel helps in navigating the complex, overlapping feature space, the linear model's direct optimization on the full feature set (including categorical data) provided a slight edge on this specific validation set. Looking at the confusion matrix, the SVM is highly accurate for Killers 3, 6, and 7, but struggles significantly to separate Killer 4 from Killer 3.
+
+\item \textbf{Decision Regions and Support Vectors in PCA Space:}
+To visualize the behavior of the SVM, we trained a new SVM model with the same optimal hyperparameters ($C=10$, RBF) strictly on the 2D PCA projection of the TRAIN set (from Q3). 
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight]{plots/Q5/svm_decision_regions.png}
+    \caption{SVM Decision Regions and Support Vectors (circled) in the 2D PCA Space.}
+    \label{fig:q5_svm_regions}
+\end{figure}
+
+As seen in (Figure \ref{fig:q5_svm_regions}), the RBF kernel induces highly flexible, non-linear decision boundaries that can wrap around dense clusters of data points. The support vectors (circled with black borders) are predominantly located near the boundaries where different killer classes overlap heavily. The sheer number of support vectors indicates that the classes are not easily separable in this 2D projection, forcing the model to rely on a large portion of the training data to define the margins between the territories of the 8 serial killers.
+
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Q6. Multi-Layer Perceptron (MLP)}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Architecture and Training:}
+We constructed a Multi-Layer Perceptron (MLP) for this multiclass classification task. The input layer takes the full feature vector of dimension $d=24$. The network consists of three hidden layers with 64, 32, and 8 units respectively, all utilizing ReLU activation functions. A dropout layer with a rate of 0.3 was applied after the first hidden layer to mitigate overfitting. The output layer has $S=8$ units with a softmax activation to produce posterior probabilities for each killer.
+
+The model was trained on the TRAIN split using categorical cross-entropy loss and the Adam optimizer. To ensure optimal convergence, we implemented an Early Stopping mechanism (patience of 150 epochs) restoring the best weights, and a learning rate scheduler (\texttt{ReduceLROnPlateau}) that progressively reduces the learning rate when the validation loss plateaus. The training and validation loss curves (Figure \ref{fig:q6_loss}) show the learning progress and confirm that the model stops training before severely overfitting.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.8\textwidth, keepaspectratio]{plots/Q6/Classification_Training_vs_Validation_Loss_plot.png}
+    \caption{Training vs. Validation Loss across epochs for the MLP.}
+    \label{fig:q6_loss}
+\end{figure}
+
+\item \textbf{Evaluation and Comparison:}
+We evaluated the final MLP on the VAL split. The model achieved a remarkable performance boost, reaching an accuracy (matching the weighted F1 score) of \textbf{95.0\%}. Comparing this to our earlier models, the MLP significantly outperforms both the Gaussian Bayes classifier (90.61\%) and the SVM (91.86\%). This demonstrates the MLP's superior ability to map the highly complex, non-linear relationships across both continuous and categorical features. The confusion matrix (Figure \ref{fig:q6_cm}) illustrates that the MLP successfully separates almost all killer classes, with only minimal misclassifications remaining between challenging profiles.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight, keepaspectratio]{plots/Q6/Confusion_matrix_for_Neural_Network_Plot.png}
+    \caption{Confusion matrix of the MLP classifier on the VAL split.}
+    \label{fig:q6_cm}
+\end{figure}
+
+\item \textbf{Permutation Feature Importance:}
+To interpret the neural network's decision-making process, we computed permutation feature importance on the validation set. First, we established a baseline validation accuracy, $A_{base}$, using the original data. Then, for each feature $j$, we randomly shuffled its values across the validation incidents, re-evaluated the model to get the new accuracy $A_j$, and computed the drop in accuracy:
+\begin{equation}
+    \Delta A_j = A_{base} - A_j
+\end{equation}
+A large positive $\Delta A_{j}$ indicates that the feature is crucial for correct classification. For one-hot encoded categorical features (like \texttt{weapon\_code} or \texttt{scene\_type}), we permuted the entire block of one-hot columns together to properly assess the raw feature's overall importance. The top 5 features are plotted in (Figure \ref{fig:q6_importance}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.25\textheight, keepaspectratio]{plots/Q6/Feature_Importance.png}
+    \caption{Top 5 most important features based on the drop in accuracy ($\Delta A_j$). Continuous features are shown in blue, and categorical blocks in red.}
+    \label{fig:q6_importance}
+\end{figure}
+
+Observing the feature importance plot, \texttt{victim\_age} is by far the most dominant continuous feature for the MLP, causing a massive drop in accuracy ($\sim$20\%) when its structure is broken. This suggests that serial killers in this dataset target highly specific age groups. Following this, spatial proximity (\texttt{dist\_precinct\_km}) and the categorical features relating to the incident's conditions (\texttt{weather}, \texttt{scene\_type}, \texttt{weapon\_code}) provide moderate but essential discriminatory power for the network.
+
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Q7. Principal Component Analysis (PCA)}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Standardisation and PCA on TRAIN:}
+To investigate whether killer identities can be separated in a lower-dimensional "modus operandi" space, we first standardised the continuous features using \texttt{StandardScaler} and utilised the one-hot encoded categorical features. We then performed Principal Component Analysis (PCA) strictly on the TRAIN split.
+
+\item \textbf{Explained Variance and Component Selection:}
+We plotted the cumulative explained variance as a function of the principal components to identify an optimal number of components $m$. As shown in (Figure \ref{fig:q7_variance}), the cumulative variance curve smoothly approaches 1.0. We chose $m=16$ principal components because they capture exactly $95\%$ of the total variance in the dataset, providing a highly representative yet reduced latent space for subsequent clustering.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.3\textheight, keepaspectratio]{plots/Q7/explained_variance.png}
+    \caption{Cumulative explained variance by Principal Components. The red dashed lines indicate the $m=16$ threshold for 95\% variance.}
+    \label{fig:q7_variance}
+\end{figure}
+
+\item \textbf{2D Projection of the VAL split:}
+Using the PCA transformation fitted on the TRAIN split, we projected the VAL feature vectors onto the first two principal components (PC1 and PC2). As required, we colored these points according to the predicted killer labels from our SVM classifier (developed in Q5) to analyze how our supervised model partitions the space. (Figure \ref{fig:q7_val_pca}) displays the scatter plot of these 2D points with a corresponding legend.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.3\textheight, keepaspectratio]{plots/Q7/val_pca_projection.png}
+    \caption{PCA projection of the VAL split onto the first two components (PC1 vs PC2), coloured by the SVM predicted killer labels.}
+    \label{fig:q7_val_pca}
+\end{figure}
+
+Observing the 2D projection, we do not see $S=8$ perfectly distinct, well-separated groups. Instead, there is massive overlap in the central region of the space. However, specific clusters occupy distinct peripheral regions. This visual overlap in 2D aligns with the difficulty our earlier linear classifiers faced, confirming that distinguishing the killers requires higher-dimensional interactions that cannot be easily flattened into two dimensions.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Q8. K-means clustering in latent space}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Latent Space Projection and Clustering:}
+We treated the killer identification as an unsupervised clustering problem in the reduced PCA space. We projected all splits (TRAIN, VAL, TEST) onto the $m=16$ principal components selected in Q7, creating a latent representation $z_{i}\in\mathbb{R}^{m}$. We then applied the K-means algorithm with $k=S=8$ clusters exclusively on the TRAIN vectors to obtain a cluster label $c_{i}^{(km)}\in\{1,\dots,8\}$ for each incident. The algorithm yielded a silhouette score of 0.155 on the TRAIN set, quantitatively confirming the high degree of overlap observed visually in Q7.
+
+\item \textbf{Cluster-to-Label Mapping and Evaluation:}
+To translate the unsupervised clusters into killer predictions, we built a mapping function $g(q)$ using majority voting on the TRAIN split:
+\begin{equation}
+    g(q) = \arg\max_{k\in\{1,\dots,S\}} \sum_{i\in TRAIN}\delta_{c_{i}^{(km)},q}\delta_{K_{i},k}
+\end{equation}
+where $K_{i}$ is the true killer for incident $i$. The mapping revealed a severe imbalance due to data density: five out of the eight clusters (0, 1, 2, 4, and 7) were mapped to Killer 3 via majority vote, while the remaining three clusters mapped to Killers 7, 6, and 2 respectively. Consequently, Killers 1, 4, 5, and 8 were completely absorbed by other denser profiles in the latent space.
+
+We evaluated this mapping by predicting labels for the VAL and TEST splits. Despite the simplistic unsupervised approach, the K-means mapping achieved an accuracy of \textbf{83.92\%} on the VAL set and \textbf{83.91\%} on the TEST set, largely driven by correctly predicting the major classes.
+
+\item \textbf{Visualizing TEST Predictions:}
+Finally, we projected the TEST incidents onto PC1 and PC2 and coloured them according to the unsupervised predictions $\hat{c}_{i}$ generated by the K-means mapping.
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.3\textheight, keepaspectratio]{plots/Q8/test_pca_kmeans_predictions.png}
+    \caption{PCA projection of the TEST split, coloured by the K-means predicted killer labels.}
+    \label{fig:q8_test_pca}
+\end{figure}
+
+As seen in (Figure \ref{fig:q8_test_pca}), the K-means predictions segment the 2D PCA space into distinct, contiguous color blocks (with the green region representing the dominant Killer 3 absorbing most of the space). While this visualization shows artificially "clean" decision boundaries compared to the true heavily overlapping data distributions from Q7, it effectively illustrates how the centroid-based K-means algorithm rigidly partitions the multi-dimensional latent space into Voronoi-like cells.
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Final Submission: Soft Voting Ensemble}
+% ---------------------------------------------------------------------------
+\begin{itemize}
+\item \textbf{Ensemble Methodology and Probability Averaging:}
+To construct the final \texttt{submission.csv} file, we opted for an ensemble approach to maximize the robustness and accuracy of our predictions. Specifically, we implemented a Soft Voting Ensemble combining the posterior probabilities generated by our three strongest discriminative models: the Linear Classifier (Q4), the Support Vector Machine (Q5), and the Multi-Layer Perceptron (Q6). 
+
+Let $\hat{\pi}_{i}^{(m)}(k)$ be the predicted probability that incident $i$ was committed by killer $k$, produced by model $m \in \{\text{Linear, SVM, MLP}\}$. We calculate the ensembled probability as the unweighted average across these three models:
+\begin{equation}
+    \hat{\pi}_{i}^{(ensemble)}(k) = \frac{1}{3} \sum_{m=1}^{3} \hat{\pi}_{i}^{(m)}(k)
+\end{equation}
+The final hard classification for each incident is then determined by assigning the killer with the highest averaged posterior probability:
+\begin{equation}
+    \hat{c}_i = \arg\max_{k\in\{1,\dots,S\}} \hat{\pi}_{i}^{(ensemble)}(k)
+\end{equation}
+
+\item \textbf{Implementation and Output Construction:}
+Using a custom Python script, we extracted the individual prediction files (\texttt{Linear\_classifier\_pred.csv}, \texttt{MLP\_pred.csv}, and \texttt{SVM\_pred.csv}). The script aligns the data by \texttt{incident\_id}, aggregates the probability distributions across all 8 killer classes, and applies the aforementioned mathematical averaging using \texttt{numpy}. Finally, it constructs the required output format containing the \texttt{incident\_id}, the \texttt{predicted\_killer} ($\hat{c}_i$), and the 8 probability columns \texttt{p\_killer\_1} to \texttt{p\_killer\_8} , exporting the results to the final \texttt{submission.csv} file.
+
+\item \textbf{Evaluation and Confusion Matrix Analysis:}
+To validate the effectiveness of our ensemble strategy, we evaluated the combined predictions against the ground truth labels of the available VAL and TEST splits. The ensemble model achieved an outstanding overall accuracy of \textbf{95.19\%} and a weighted F1 score of \textbf{94.97\%}, effectively surpassing the performance of our best individual model (the MLP). We generated the confusion matrix for this final evaluation, presented in (Figure \ref{fig:ensemble_cm}).
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[height=0.27\textheight, keepaspectratio]{plots/submission/Ensemble_Confusion_Matrix.png}
+    \caption{Confusion matrix of the final Soft Voting Ensemble model, evaluated on the combined VAL and TEST splits.}
+    \label{fig:ensemble_cm}
+\end{figure}
+
+Observing the final confusion matrix (Figure \ref{fig:ensemble_cm}), the ensemble demonstrates remarkable robustness. The synergistic effect of combining linear optimization, non-linear kernel transformations, and deep feature learning mitigates the individual weaknesses of each base model. The diagonal elements are overwhelmingly dominant across all classes. While minor misclassifications still persist (e.g., Killer 5 being occasionally misclassified as Killer 3), the overall structure confirms that the ensemble approach provides a highly reliable and balanced final classification system for identifying the perpetrators.
+
+\end{itemize}
+
+% ---------------------------------------------------------------------------
+\section*{Conclusion}
+% ---------------------------------------------------------------------------
+In this project, we systematically investigated the anonymised crime dataset provided by the Piraeus Vice Homicide Division to address the central forensic question: "Who is the killer?" for each incident. By progressing through a structured sequence of machine learning methodologies, we successfully mapped the complex spatial, temporal, and categorical signatures of the $S=8$ distinct serial killers.
+
+Our initial exploratory data analysis and Maximum Likelihood Estimation revealed that the killers operate in specific temporal hotspots and distinct geographical territories, though with significant overlap. While generative approaches, such as the Multiclass Gaussian Bayes classifier, established a solid baseline , they were ultimately constrained by the highly non-linear nature of the decision boundaries. Discriminative models, namely the Linear classifier and the Support Vector Machine (SVM), improved our predictive capabilities by effectively leveraging both continuous and one-hot encoded categorical features. 
+
+The investigation highlighted the necessity of deep feature learning, as demonstrated by the Multi-Layer Perceptron (MLP), which accurately modeled the complex interactions within the data and identified \texttt{victim\_age} as the most critical discriminatory factor. Furthermore, our experiments with PCA and K-means clustering confirmed that while unsupervised latent space representations capture broad patterns, they are insufficient for separating heavily overlapping killer profiles without the guidance of known labels.
+
+Ultimately, by integrating the complementary strengths of our top-performing discriminative models (Linear, SVM, and MLP) into a Soft Voting Ensemble, we achieved a highly robust classification system. Yielding a final accuracy of 95.19\% and an F1-score of 94.97\%, this ensemble mitigates individual model weaknesses and provides a highly reliable solution to identifying the perpetrators behind the unsolved incidents.
+
+\newpage
+% ---------------------------------------------------------------------------
+\section*{Appendix A: Use of ChatGPT and Other LLMs}
+% ---------------------------------------------------------------------------
+In accordance with the project guidelines regarding transparency and academic integrity, this section outlines the use of Large Language Models (LLMs) during the development of this assignment.
+
+LLMs were utilized exclusively to obtain high-level guidance for specific programming implementations and formatting challenges. We remained fully responsible for checking the correctness of all generated suggestions, understanding every step, and independently reproducing the results. 
+
+The primary areas where assistance was sought include:
+\begin{itemize}
+    \item \textbf{Q2(c) Mahalanobis Distance Ellipses:} Guidance was requested on how to properly compute and plot an ellipse for each killer in the selected two-dimensional projections.
+    \item \textbf{Q3(c) Bayesian Decision Regions:} Assistance was used to understand how to correctly generate a mesh grid to visualise the decision regions induced by the Bayes classifier.
+    \item \textbf{Q4(c) Linear Decision Boundaries:} High-level programming suggestions were obtained to properly overlay the approximate linear decision boundaries on the 2D PCA projection.
+    \item \textbf{Q5(c) SVM Non-linear Regions:} Guidance was utilized to map the feature space and effectively visualise the induced non-linear decision regions.
+    \item \textbf{LaTeX Mathematical Formatting:} General assistance was sought to learn the proper syntax for formatting complex mathematical equations, derivations, and structures within the LaTeX environment.
+\end{itemize}
+
+\end{document}

@@ -1,3 +1,8 @@
+# Alexios Kastanaras P22062, 
+# Danai Harzaka P22194,
+# Dimitrios Lazanas P22082
+# Contact email for the group: alexioskast@gmail.com
+ 
 import pandas as pd
 import numpy as np
 from pathlib import Path
@@ -97,18 +102,32 @@ print(f"Number of components for 95% variance: {m}")
 # --------------------------------------------------------
 # c) Project VAL onto PC1, PC2
 # --------------------------------------------------------
-# Project VAL data
 X_val_embed = pca.transform(X_val)
 
-plt.figure(figsize=(8, 6))
-plt.scatter(X_val_embed[:, 0], X_val_embed[:, 1], c=y.iloc[ix_dev], cmap="tab10", alpha=0.7)
-plt.title("PCA on VAL: First Two Components", fontsize=16, fontweight="bold")
+svm_preds_path = projectDir / "data" / "predictions" / "SVM_pred.csv"
+svm_preds_df = pd.read_csv(svm_preds_path)
+val_incident_ids = data.loc[ix_dev, "incident_id"].values
+
+val_order_df = pd.DataFrame({'incident_id': val_incident_ids})
+
+merged_preds = val_order_df.merge(svm_preds_df, on="incident_id", how="left")
+val_svm_predictions = merged_preds['predicted_killer'].values
+
+plt.figure(figsize=(10, 8)) 
+scatter = plt.scatter(X_val_embed[:, 0], X_val_embed[:, 1], c=val_svm_predictions, cmap="tab10", alpha=0.7)
+
+plt.title("PCA on VAL: Coloured by SVM Predictions", fontsize=16, fontweight="bold")
 plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
-plt.tight_layout()
-plt.savefig(str(q7_plotsPath / "val_pca_projection.png"), dpi=300)
-plt.close()
 
+handles, _ = scatter.legend_elements()
+unique_killers = np.sort(np.unique(val_svm_predictions))
+killer_labels = [f"Killer {int(k)}" for k in unique_killers]
+
+plt.legend(handles, killer_labels, title="Predicted Killer", loc='best')
+plt.tight_layout()
+plt.savefig(str(q7_plotsPath / "val_pca_projection.png"), dpi=300, bbox_inches="tight")
+plt.close()
 # --------------------------------------------------------
 # Q8 k-means clustering in latent space
 # --------------------------------------------------------
@@ -159,11 +178,15 @@ test_acc = np.mean(test_preds == y.iloc[ix_test].values)
 print(f"TEST Accuracy (K-Means): {test_acc:.4f}")
 
 # f) Scatter plot for TEST (PC1 vs PC2) coloured by PREDICTED label
-plt.figure(figsize=(8, 6))
+plt.figure(figsize=(10, 8))
 plt.scatter(X_test_embed[:, 0], X_test_embed[:, 1], c=test_preds, cmap="tab10", alpha=0.7)
 plt.title("PCA on TEST: Coloured by K-Means Predictions", fontsize=16, fontweight="bold")
 plt.xlabel("Principal Component 1")
 plt.ylabel("Principal Component 2")
+handles, _ = scatter.legend_elements()
+unique_killers_test = np.sort(np.unique(test_preds))
+killer_labels_test = [f"Killer {int(k)}" for k in unique_killers_test]
+plt.legend(handles, killer_labels_test, title="Predicted Killer", loc='best')
 plt.tight_layout()
 plt.savefig(str(q8_plotsPath / "test_pca_kmeans_predictions.png"), dpi=300)
 plt.close()
