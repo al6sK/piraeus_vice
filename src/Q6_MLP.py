@@ -108,10 +108,6 @@ base_acc = accuracy_score(y_true_int, y_pred_int)
 
 print(f"Weighted F1 score: {base_score:.3f}")
 print(f"Accuracy: {base_acc:.3f}")
-
-# saving model
-model.save("src/best_model.h5")
-
 # --------------------------------------------------
 # Create DataFrame from model history
 # --------------------------------------------------

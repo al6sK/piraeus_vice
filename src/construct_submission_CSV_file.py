@@ -90,7 +90,7 @@ labels = sorted(list(set(y_true))) # Ετικέτες 1-8
 fig, ax = plt.subplots(figsize=(8, 8))
 disp = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels=labels)
 disp.plot(values_format='d')
-plt.title(f"Ensemble Confusion Matrix\nAcc: {acc:.4f} - F1: {f1_weighted:.4f}")
+plt.title(f"Submission Confusion Matrix\nAcc: {acc:.4f} - F1: {f1_weighted:.4f}")
 plt.tight_layout()
 cm_path = plots_path / "Ensemble_Confusion_Matrix.png"
 plt.savefig(cm_path, dpi=300)
