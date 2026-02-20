@@ -1,5 +1,5 @@
 # Alexios Kastanaras P22062, 
-# Danai Harzaka P22194,
+# Danai Charzaka P22194,
 # Dimitrios Lazanas P22082
 # Contact email for the group: alexioskast@gmail.com
 
